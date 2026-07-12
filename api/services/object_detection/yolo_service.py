@@ -18,6 +18,7 @@ class YoloPredictionService:
 
         self._model: Any | None = None
         self._model_path: Path | None = None
+        self._is_warmed_up = False
 
     def predict(self, image_bytes: bytes) -> list[ObjectDetection]:
         """Run inference on raw image bytes and return normalized detections."""
@@ -26,6 +27,12 @@ class YoloPredictionService:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
         results = model.predict(image, verbose=False)
         return self._normalize_output(results)
+
+    def load(self) -> None:
+        """Preload the configured YOLO model into memory and warm it up."""
+
+        model = self._load_model()
+        self._warm_up(model)
 
     def _load_model(self) -> Any:
         """Load and cache the configured YOLO checkpoint."""
@@ -46,6 +53,16 @@ class YoloPredictionService:
         self._model = YOLO(str(model_path))
         self._model_path = model_path
         return self._model
+
+    def _warm_up(self, model: Any) -> None:
+        """Run one startup inference so the first request avoids warmup cost."""
+
+        if self._is_warmed_up:
+            return
+
+        warmup_image = Image.new("RGB", (640, 640), color=(0, 0, 0))
+        model.predict(warmup_image, verbose=False)
+        self._is_warmed_up = True
 
     def _resolve_model_path(self) -> Path:
         """Resolve the first available PyTorch checkpoint in the model directory."""
