@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
+from PIL.Image import Image as PILImage
 
 from api.config import settings
 from api.models.object_detection import ObjectDetection
@@ -21,18 +22,39 @@ class YoloPredictionService:
         self._is_warmed_up = False
 
     def predict(self, image_bytes: bytes) -> list[ObjectDetection]:
-        """Run inference on raw image bytes and return normalized detections."""
+        """Run inference on one raw image payload."""
+
+        detections = self.predict_batch_from_bytes([image_bytes])
+        return detections[0] if detections else []
+
+    def predict_batch_from_bytes(
+        self, image_payloads: list[bytes]
+    ) -> list[list[ObjectDetection]]:
+        """Decode and run inference on multiple image payloads in one model call."""
+
+        images = [self._decode_image(image_bytes) for image_bytes in image_payloads]
+        return self.predict_batch(images)
+
+    def predict_batch(self, images: list[PILImage]) -> list[list[ObjectDetection]]:
+        """Run inference on multiple decoded images in a single YOLO call."""
+
+        if not images:
+            return []
 
         model = self._load_model()
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        results = model.predict(image, verbose=False)
-        return self._normalize_output(results)
+        results = model.predict(images, verbose=False)
+        return [self._normalize_result(result) for result in results]
 
     def load(self) -> None:
         """Preload the configured YOLO model into memory and warm it up."""
 
         model = self._load_model()
         self._warm_up(model)
+
+    def _decode_image(self, image_bytes: bytes) -> PILImage:
+        """Decode raw image bytes into an RGB PIL image."""
+
+        return Image.open(BytesIO(image_bytes)).convert("RGB")
 
     def _load_model(self) -> Any:
         """Load and cache the configured YOLO checkpoint."""
@@ -76,13 +98,9 @@ class YoloPredictionService:
             )
         return candidates[0]
 
-    def _normalize_output(self, raw_output: Any) -> list[ObjectDetection]:
-        """Convert Ultralytics prediction results into API response models."""
+    def _normalize_result(self, result: Any) -> list[ObjectDetection]:
+        """Convert one Ultralytics result object into API response models."""
 
-        if not raw_output:
-            return []
-
-        result = raw_output[0]
         boxes = getattr(result, "boxes", None)
         if boxes is None:
             return []
