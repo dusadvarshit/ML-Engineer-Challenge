@@ -130,7 +130,7 @@ class DatasetDownloader:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download datasets for ML challenge")
-    parser.add_argument("--dataset", choices=list(DatasetDownloader({}).datasets.keys()) + ["all"], 
+    parser.add_argument("--dataset", choices=list(DatasetDownloader().datasets.keys()) + ["all"], 
                        default="all", help="Dataset to download")
     parser.add_argument("--data-dir", default="data", help="Data directory")
     
