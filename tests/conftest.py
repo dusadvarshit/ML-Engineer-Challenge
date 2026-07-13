@@ -48,6 +48,20 @@ def sample_image_bytes() -> bytes:
 
 
 @pytest.fixture
+def sample_upload_file(sample_image_bytes: bytes):
+    """Build one multipart upload tuple for FastAPI client requests."""
+
+    def build(
+        filename: str = "image.png",
+        content_type: str = "image/png",
+        payload: bytes | None = None,
+    ) -> tuple[str, bytes, str]:
+        return (filename, sample_image_bytes if payload is None else payload, content_type)
+
+    return build
+
+
+@pytest.fixture
 def sample_text_bytes() -> bytes:
     """Return a non-image payload for validation tests."""
 

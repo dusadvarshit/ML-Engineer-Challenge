@@ -1,54 +1,8 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environments
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project Specific
-data/
-logs/
-models/artifacts/
-*.log
-.env
 .coverage
-htmlcov/
-
-# Docker
-.dockerignore
-
-# Model files
-*.pth
-*.onnx
-*.trt
-*.bin
+.pytest_cache/
+.venv/
+data/
+models/artifacts/
+monitoring/prometheus/data/
