@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from api.config import settings
 from api.routers.classification import router as classification_router
 from api.routers.object_detection import router as object_detection_router
+from api.services.cache_service import redis_cache_service
 from api.services.object_detection.yolo_service import yolo_prediction_service
 
 
@@ -15,8 +16,12 @@ from api.services.object_detection.yolo_service import yolo_prediction_service
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Load API resources before the application starts serving traffic."""
 
+    await redis_cache_service.startup()
     yolo_prediction_service.load()
-    yield
+    try:
+        yield
+    finally:
+        await redis_cache_service.shutdown()
 
 
 app = FastAPI(
