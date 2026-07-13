@@ -24,9 +24,10 @@ def _patch_lifespan_dependencies(
     async def noop_async() -> None:
         return None
 
-    monkeypatch.setattr(main_module.redis_cache_service, "startup", startup or noop_async)
-    monkeypatch.setattr(main_module.redis_cache_service, "shutdown", shutdown or noop_async)
-    monkeypatch.setattr(main_module.yolo_prediction_service, "load", load or (lambda: None))
+    monkeypatch.setattr(main_module, 'init_database', lambda: None)
+    monkeypatch.setattr(main_module.redis_cache_service, 'startup', startup or noop_async)
+    monkeypatch.setattr(main_module.redis_cache_service, 'shutdown', shutdown or noop_async)
+    monkeypatch.setattr(main_module.yolo_prediction_service, 'load', load or (lambda: None))
 
 
 def test_detect_endpoint_uses_app_routing(
@@ -38,7 +39,7 @@ def test_detect_endpoint_uses_app_routing(
     _patch_lifespan_dependencies(monkeypatch)
     monkeypatch.setattr(
         router_module.yolo_prediction_service,
-        "predict",
+        'predict',
         lambda _: [
             ObjectDetection(
                 x1=0.0,
@@ -53,12 +54,12 @@ def test_detect_endpoint_uses_app_routing(
 
     with TestClient(main_module.app) as client:
         response = client.post(
-            "/api/v1/detect",
-            files={"file": ("image.png", sample_image_bytes, "image/png")},
+            '/api/v1/detect',
+            files={'file': ('image.png', sample_image_bytes, 'image/png')},
         )
 
     assert response.status_code == 200
-    assert response.json()["detections"][0]["class_id"] == 3
+    assert response.json()['detections'][0]['class_id'] == 3
 
 
 def test_startup_failure_from_model_load_bubbles_out(
@@ -67,10 +68,10 @@ def test_startup_failure_from_model_load_bubbles_out(
     """App startup errors should fail fast during integration testing."""
 
     def raise_startup_error() -> None:
-        raise RuntimeError("startup failed")
+        raise RuntimeError('startup failed')
 
     _patch_lifespan_dependencies(monkeypatch, load=raise_startup_error)
 
-    with pytest.raises(RuntimeError, match="startup failed"):
+    with pytest.raises(RuntimeError, match='startup failed'):
         with TestClient(main_module.app):
             pass

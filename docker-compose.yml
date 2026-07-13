@@ -11,11 +11,17 @@ services:
       - ./models/artifacts:/opt/models/artifacts:ro
     environment:
       PORT: '8000'
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlchallenge
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      REQUEST_USER_HEADER_NAME: X-User-Id
       YOLO_MODEL_DIR: /opt/models/artifacts/object_detection/yolov8n/v1.0.0/pytorch
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     deploy:
@@ -31,6 +37,29 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    networks:
+      - app-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-worker
+    restart: unless-stopped
+    command: ['celery', '-A', 'api.worker.celery_app', 'worker', '--loglevel=info', '--concurrency=2']
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlchallenge
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      REQUEST_USER_HEADER_NAME: X-User-Id
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - app-network
 

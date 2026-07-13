@@ -26,9 +26,10 @@ def app(monkeypatch: pytest.MonkeyPatch):
     async def fake_cache_shutdown() -> None:
         return None
 
-    monkeypatch.setattr(main_module.redis_cache_service, "startup", fake_cache_startup)
-    monkeypatch.setattr(main_module.redis_cache_service, "shutdown", fake_cache_shutdown)
-    monkeypatch.setattr(main_module.yolo_prediction_service, "load", lambda: None)
+    monkeypatch.setattr(main_module, 'init_database', lambda: None)
+    monkeypatch.setattr(main_module.redis_cache_service, 'startup', fake_cache_startup)
+    monkeypatch.setattr(main_module.redis_cache_service, 'shutdown', fake_cache_shutdown)
+    monkeypatch.setattr(main_module.yolo_prediction_service, 'load', lambda: None)
     return main_module.app
 
 
@@ -52,8 +53,8 @@ def sample_upload_file(sample_image_bytes: bytes):
     """Build one multipart upload tuple for FastAPI client requests."""
 
     def build(
-        filename: str = "image.png",
-        content_type: str = "image/png",
+        filename: str = 'image.png',
+        content_type: str = 'image/png',
         payload: bytes | None = None,
     ) -> tuple[str, bytes, str]:
         return (filename, sample_image_bytes if payload is None else payload, content_type)
@@ -65,7 +66,7 @@ def sample_upload_file(sample_image_bytes: bytes):
 def sample_text_bytes() -> bytes:
     """Return a non-image payload for validation tests."""
 
-    return b"plain-text-payload"
+    return b'plain-text-payload'
 
 
 @pytest.fixture
