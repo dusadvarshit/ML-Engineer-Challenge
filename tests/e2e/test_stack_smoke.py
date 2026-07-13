@@ -16,6 +16,9 @@ pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_BASE_URL = "http://127.0.0.1"
 _DEFAULT_PROMETHEUS_URL = "http://127.0.0.1:9090"
+_DEFAULT_GRAFANA_URL = "http://127.0.0.1:3000"
+_DEFAULT_GRAFANA_USER = "admin"
+_DEFAULT_GRAFANA_PASSWORD = "admin"
 _REQUEST_TIMEOUT_SECONDS = 5.0
 _STARTUP_TIMEOUT_SECONDS = 240.0
 
@@ -72,6 +75,9 @@ def e2e_endpoints() -> dict[str, str]:
         return {
             "base_url": base_url.rstrip("/"),
             "prometheus_url": os.getenv("E2E_PROMETHEUS_URL", _DEFAULT_PROMETHEUS_URL).rstrip("/"),
+            "grafana_url": os.getenv("E2E_GRAFANA_URL", _DEFAULT_GRAFANA_URL).rstrip("/"),
+            "grafana_user": os.getenv("E2E_GRAFANA_USER", _DEFAULT_GRAFANA_USER),
+            "grafana_password": os.getenv("E2E_GRAFANA_PASSWORD", _DEFAULT_GRAFANA_PASSWORD),
         }
 
     if os.getenv("E2E_MANAGE_STACK") != "1":
@@ -94,6 +100,7 @@ def e2e_endpoints() -> dict[str, str]:
 
     base_url = _DEFAULT_BASE_URL
     prometheus_url = _DEFAULT_PROMETHEUS_URL
+    grafana_url = _DEFAULT_GRAFANA_URL
 
     try:
         _wait_for_http_ready(
@@ -104,9 +111,16 @@ def e2e_endpoints() -> dict[str, str]:
             f"{prometheus_url}/-/healthy",
             timeout_seconds=_STARTUP_TIMEOUT_SECONDS,
         )
+        _wait_for_http_ready(
+            f"{grafana_url}/api/health",
+            timeout_seconds=_STARTUP_TIMEOUT_SECONDS,
+        )
         yield {
             "base_url": base_url,
             "prometheus_url": prometheus_url,
+            "grafana_url": grafana_url,
+            "grafana_user": _DEFAULT_GRAFANA_USER,
+            "grafana_password": _DEFAULT_GRAFANA_PASSWORD,
         }
     finally:
         _run_compose("down", "-v", "--remove-orphans")
@@ -148,6 +162,35 @@ def test_prometheus_container_is_healthy(e2e_endpoints: dict[str, str]) -> None:
 
     assert response.status_code == 200
     assert response.text.strip() == "Prometheus Server is Healthy."
+
+
+def test_grafana_container_is_healthy(e2e_endpoints: dict[str, str]) -> None:
+    """Grafana should expose its health endpoint alongside the stack."""
+
+    response = httpx.get(
+        f"{e2e_endpoints['grafana_url']}/api/health",
+        timeout=_REQUEST_TIMEOUT_SECONDS,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['database'] == 'ok'
+
+
+
+def test_grafana_has_prometheus_datasource(e2e_endpoints: dict[str, str]) -> None:
+    """Grafana should provision the Prometheus datasource automatically."""
+
+    response = httpx.get(
+        f"{e2e_endpoints['grafana_url']}/api/datasources/name/Prometheus",
+        auth=(e2e_endpoints['grafana_user'], e2e_endpoints['grafana_password']),
+        timeout=_REQUEST_TIMEOUT_SECONDS,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['type'] == 'prometheus'
+    assert payload['url'] == 'http://prometheus:9090'
 
 
 def test_detect_endpoint_accepts_real_image_upload(
