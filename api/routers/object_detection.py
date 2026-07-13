@@ -1,6 +1,7 @@
 """Object detection routes."""
 
 from time import perf_counter
+from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
@@ -10,9 +11,14 @@ from api.models.object_detection import (
     BatchObjectDetectionResponse,
     InferenceTask,
     ObjectDetection,
+    ObjectDetectionModel,
     ObjectDetectionResponse,
 )
 from api.services.cache_service import redis_cache_service
+from api.services.object_detection.registry import (
+    ObjectDetectionPredictionService,
+    get_object_detection_service,
+)
 from api.services.object_detection.yolo_service import yolo_prediction_service
 
 MAX_BATCH_SIZE = 5
@@ -21,13 +27,17 @@ router = APIRouter(tags=['object-detection'])
 
 
 @router.post('/detect', response_model=ObjectDetectionResponse)
-async def detect_objects(file: UploadFile = File(...)) -> ObjectDetectionResponse:
+async def detect_objects(
+    file: UploadFile = File(...),
+    model: Annotated[ObjectDetectionModel, Form()] = ObjectDetectionModel.YOLOV8N,
+) -> ObjectDetectionResponse:
     """Run object detection on an uploaded image."""
 
     image_bytes = await _read_image_bytes(file)
+    prediction_service = get_object_detection_service(model)
 
     try:
-        model_version = yolo_prediction_service.get_model_version()
+        model_version = prediction_service.get_model_version()
         cached_detections = await redis_cache_service.get_detection(
             image_bytes,
             model_version,
@@ -37,7 +47,7 @@ async def detect_objects(file: UploadFile = File(...)) -> ObjectDetectionRespons
 
         started_at = perf_counter()
         try:
-            detections = yolo_prediction_service.predict(image_bytes)
+            detections = prediction_service.predict(image_bytes)
         except (FileNotFoundError, RuntimeError):
             observe_inference(
                 task=InferenceTask.DETECT.value,
@@ -70,6 +80,7 @@ async def detect_objects(file: UploadFile = File(...)) -> ObjectDetectionRespons
 async def batch_inference(
     task: InferenceTask = Form(...),
     files: list[UploadFile] = File(...),
+    model: Annotated[ObjectDetectionModel, Form()] = ObjectDetectionModel.YOLOV8N,
 ) -> BatchObjectDetectionResponse:
     """Run batch inference for up to five uploaded images."""
 
@@ -86,11 +97,16 @@ async def batch_inference(
         )
 
     outcome = 'success'
+    prediction_service = get_object_detection_service(model)
 
     try:
         image_payloads = [await _read_image_bytes(file) for file in files]
-        model_version = yolo_prediction_service.get_model_version()
-        batch_detections = await _get_batch_detections(image_payloads, model_version)
+        model_version = prediction_service.get_model_version()
+        batch_detections = await _get_batch_detections(
+            image_payloads,
+            model_version,
+            prediction_service,
+        )
     except FileNotFoundError as exc:
         outcome = 'error'
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -118,6 +134,7 @@ async def batch_inference(
 async def _get_batch_detections(
     image_payloads: list[bytes],
     model_version: str,
+    prediction_service: ObjectDetectionPredictionService,
 ) -> list[list[ObjectDetection]]:
     """Return detections for a batch while reusing per-image cache entries."""
 
@@ -140,7 +157,7 @@ async def _get_batch_detections(
     if missed_payloads:
         started_at = perf_counter()
         try:
-            fresh_detections = yolo_prediction_service.predict_batch_from_bytes(missed_payloads)
+            fresh_detections = prediction_service.predict_batch_from_bytes(missed_payloads)
         except (FileNotFoundError, RuntimeError):
             observe_inference(
                 task=InferenceTask.DETECT.value,

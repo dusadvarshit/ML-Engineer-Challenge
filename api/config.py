@@ -25,6 +25,18 @@ class Settings:
             "models/artifacts/object_detection/yolov8n/v1.0.0/pytorch",
         )
     )
+    DETR_MODEL_DIR: Path = Path(
+        os.getenv(
+            "DETR_MODEL_DIR",
+            "models/artifacts/object_detection/detr_resnet50/v1.0.0/pytorch",
+        )
+    )
+    RETINANET_MODEL_DIR: Path = Path(
+        os.getenv(
+            "RETINANET_MODEL_DIR",
+            "models/artifacts/object_detection/retinanet_resnet50_fpn/v1.0.0/pytorch",
+        )
+    )
 
     # Authentication
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")

@@ -12,6 +12,14 @@ class InferenceTask(str, Enum):
     DETECT = "detect"
 
 
+class ObjectDetectionModel(str, Enum):
+    """Supported object detection model backends."""
+
+    YOLOV8N = "yolov8n"
+    DETR_RESNET50 = "detr_resnet50"
+    RETINANET_RESNET50_FPN = "retinanet_resnet50_fpn"
+
+
 class ObjectDetection(BaseModel):
     """Single object detection result."""
 
