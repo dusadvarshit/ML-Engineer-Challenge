@@ -11,9 +11,11 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from api.config import settings
+from api.metrics import observe_cache_operation
 from api.models.object_detection import ObjectDetection
 
 logger = logging.getLogger(__name__)
+DETECTION_CACHE_NAME = 'detection'
 
 
 class RedisCacheService:
@@ -53,7 +55,7 @@ class RedisCacheService:
             await client.ping()
         except (OSError, RedisError) as exc:
             logger.warning(
-                "Redis unavailable; continuing without cache support: %s",
+                'Redis unavailable; continuing without cache support: %s',
                 exc,
             )
             await self._close_client(client)
@@ -63,7 +65,7 @@ class RedisCacheService:
 
         self._client = client
         self._is_available = True
-        logger.info("Redis cache service connected.")
+        logger.info('Redis cache service connected.')
 
     async def shutdown(self) -> None:
         """Close any active Redis client."""
@@ -79,7 +81,7 @@ class RedisCacheService:
         """Build a stable cache key for one detection request."""
 
         digest = hashlib.sha256(image_bytes).hexdigest()
-        return f"detect:{model_version}:{digest}"
+        return f'detect:{model_version}:{digest}'
 
     async def get_detection(
         self,
@@ -90,6 +92,11 @@ class RedisCacheService:
 
         client = self.client
         if client is None:
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='lookup',
+                outcome='unavailable',
+            )
             return None
 
         key = self.build_detection_key(image_bytes, model_version)
@@ -97,18 +104,40 @@ class RedisCacheService:
         try:
             payload = await client.get(key)
         except (OSError, RedisError) as exc:
-            logger.warning("Redis get failed for %s: %s", key, exc)
+            logger.warning('Redis get failed for %s: %s', key, exc)
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='lookup',
+                outcome='error',
+            )
             return None
 
         if payload is None:
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='lookup',
+                outcome='miss',
+            )
             return None
 
         try:
             cached_items = json.loads(payload)
-            return [ObjectDetection.model_validate(item) for item in cached_items]
+            detections = [ObjectDetection.model_validate(item) for item in cached_items]
         except (TypeError, ValueError) as exc:
-            logger.warning("Invalid cached detection payload for %s: %s", key, exc)
+            logger.warning('Invalid cached detection payload for %s: %s', key, exc)
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='lookup',
+                outcome='invalid',
+            )
             return None
+
+        observe_cache_operation(
+            cache=DETECTION_CACHE_NAME,
+            operation='lookup',
+            outcome='hit',
+        )
+        return detections
 
     async def set_detection(
         self,
@@ -120,26 +149,41 @@ class RedisCacheService:
 
         client = self.client
         if client is None:
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='store',
+                outcome='unavailable',
+            )
             return False
 
         key = self.build_detection_key(image_bytes, model_version)
         payload = json.dumps(
             [detection.model_dump() for detection in detections],
-            separators=(",", ":"),
+            separators=(',', ':'),
         )
 
         try:
             await client.setex(key, settings.MODEL_CACHE_TTL, payload)
         except (OSError, RedisError) as exc:
-            logger.warning("Redis set failed for %s: %s", key, exc)
+            logger.warning('Redis set failed for %s: %s', key, exc)
+            observe_cache_operation(
+                cache=DETECTION_CACHE_NAME,
+                operation='store',
+                outcome='error',
+            )
             return False
 
+        observe_cache_operation(
+            cache=DETECTION_CACHE_NAME,
+            operation='store',
+            outcome='success',
+        )
         return True
 
     async def _close_client(self, client: Redis) -> None:
         """Close a Redis client across redis-py versions."""
 
-        close = getattr(client, "aclose", None)
+        close = getattr(client, 'aclose', None)
         if close is not None:
             await close()
             return

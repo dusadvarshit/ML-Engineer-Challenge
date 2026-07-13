@@ -66,6 +66,28 @@ def test_predict_returns_first_batch_result(monkeypatch: pytest.MonkeyPatch) -> 
     assert result == expected[0]
 
 
+def test_predict_batch_from_bytes_decodes_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raw batch payloads should be decoded before batch inference."""
+
+    service = YoloPredictionService()
+    decoded_images = [object(), object()]
+
+    monkeypatch.setattr(
+        service,
+        "_decode_image",
+        lambda image_bytes: decoded_images[0] if image_bytes == b"one" else decoded_images[1],
+    )
+    predict_batch = monkeypatch.setattr(
+        service,
+        "predict_batch",
+        lambda images: [list(images)],
+    )
+
+    result = service.predict_batch_from_bytes([b"one", b"two"])
+
+    assert result == [decoded_images]
+
+
 def test_predict_batch_returns_empty_list_for_no_images() -> None:
     """Batch prediction should short-circuit empty input."""
 
@@ -92,8 +114,6 @@ def test_resolve_model_path_prefers_sorted_checkpoint_files(tmp_path: Path) -> N
     (tmp_path / "zeta.pth").write_bytes(b"checkpoint")
     first_checkpoint = tmp_path / "alpha.pt"
     first_checkpoint.write_bytes(b"checkpoint")
-
-    service_dir = types.SimpleNamespace(glob=tmp_path.glob)
 
     from api.services.object_detection import yolo_service as yolo_service_module
 
@@ -145,6 +165,40 @@ def test_predict_batch_normalizes_model_results() -> None:
     assert fake_model.predict_calls[0][1] is False
 
 
+def test_load_warms_up_loaded_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Service load should trigger both model loading and warmup."""
+
+    service = YoloPredictionService()
+    fake_model = FakeModel()
+    warmup_calls = []
+
+    monkeypatch.setattr(service, "_load_model", lambda: fake_model)
+    monkeypatch.setattr(service, "_warm_up", lambda model: warmup_calls.append(model))
+
+    service.load()
+
+    assert warmup_calls == [fake_model]
+
+
+def test_get_model_version_falls_back_to_model_filename() -> None:
+    """Shallow model paths should use the checkpoint filename as the version key."""
+
+    service = YoloPredictionService()
+
+    assert service._format_model_version(Path("model.pt")) == "model.pt"
+
+
+def test_get_model_version_uses_cached_model_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Model version should not resolve the filesystem again once the model path is cached."""
+
+    service = YoloPredictionService()
+    service._model_path = Path("models/artifacts/object_detection/yolov8n/v1.0.0/pytorch/model.pt")
+
+    monkeypatch.setattr(service, "_resolve_model_path", lambda: (_ for _ in ()).throw(AssertionError))
+
+    assert service.get_model_version() == "yolov8n-v1.0.0-model.pt"
+
+
 def test_normalize_result_uses_defaults_when_confidence_or_class_missing() -> None:
     """Missing optional result data should fall back to API-safe defaults."""
 
@@ -154,6 +208,16 @@ def test_normalize_result_uses_defaults_when_confidence_or_class_missing() -> No
 
     assert detections[0].confidence == 0.0
     assert detections[0].class_id == -1
+
+
+def test_normalize_result_returns_empty_list_when_boxes_missing() -> None:
+    """Results without boxes should serialize as empty detections."""
+
+    service = YoloPredictionService()
+
+    detections = service._normalize_result(types.SimpleNamespace(boxes=None))
+
+    assert detections == []
 
 
 def test_warm_up_runs_only_once() -> None:
@@ -167,6 +231,29 @@ def test_warm_up_runs_only_once() -> None:
 
     assert len(fake_model.predict_calls) == 1
     assert service._is_warmed_up is True
+
+
+def test_load_model_raises_runtime_error_when_ultralytics_is_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Missing Ultralytics should produce a serving-friendly runtime error."""
+
+    service = YoloPredictionService()
+    model_path = tmp_path / "model.pt"
+    model_path.write_bytes(b"checkpoint")
+
+    monkeypatch.setattr(service, "_resolve_model_path", lambda: model_path)
+    sys.modules.pop("ultralytics", None)
+
+    real_import = __import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "ultralytics":
+            raise ModuleNotFoundError("No module named ultralytics")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    with pytest.raises(RuntimeError, match="Ultralytics is required"):
+        service._load_model()
 
 
 def test_load_model_caches_loaded_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
