@@ -8,6 +8,7 @@ from api.models.object_detection import (
     InferenceTask,
     ObjectDetectionResponse,
 )
+from api.services.cache_service import redis_cache_service
 from api.services.object_detection.yolo_service import yolo_prediction_service
 
 MAX_BATCH_SIZE = 5
@@ -21,7 +22,20 @@ async def detect_objects(file: UploadFile = File(...)) -> ObjectDetectionRespons
 
     image_bytes = await _read_image_bytes(file)
     try:
+        model_version = yolo_prediction_service.get_model_version()
+        cached_detections = await redis_cache_service.get_detection(
+            image_bytes,
+            model_version,
+        )
+        if cached_detections is not None:
+            return ObjectDetectionResponse(detections=cached_detections)
+
         detections = yolo_prediction_service.predict(image_bytes)
+        await redis_cache_service.set_detection(
+            image_bytes,
+            model_version,
+            detections,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except RuntimeError as exc:

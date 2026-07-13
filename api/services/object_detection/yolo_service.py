@@ -51,6 +51,12 @@ class YoloPredictionService:
         model = self._load_model()
         self._warm_up(model)
 
+    def get_model_version(self) -> str:
+        """Return a stable model identifier for cache key generation."""
+
+        model_path = self._model_path or self._resolve_model_path()
+        return self._format_model_version(model_path)
+
     def _decode_image(self, image_bytes: bytes) -> PILImage:
         """Decode raw image bytes into an RGB PIL image."""
 
@@ -97,6 +103,16 @@ class YoloPredictionService:
                 "Add a .pt or .pth file there first."
             )
         return candidates[0]
+
+    def _format_model_version(self, model_path: Path) -> str:
+        """Format a human-readable model version string for cache keys."""
+
+        if len(model_path.parents) >= 3:
+            model_name = model_path.parents[2].name or "model"
+            version = model_path.parents[1].name or "unknown"
+            return f"{model_name}-{version}-{model_path.name}"
+
+        return model_path.name
 
     def _normalize_result(self, result: Any) -> list[ObjectDetection]:
         """Convert one Ultralytics result object into API response models."""
