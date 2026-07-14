@@ -28,14 +28,6 @@ SessionLocal = sessionmaker(
 )
 
 
-def init_database() -> None:
-    """Create relational tables required by the API."""
-
-    from api.services.request_log_service import RequestLog
-
-    Base.metadata.create_all(bind=engine, tables=[RequestLog.__table__])
-
-
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Provide one transactional SQLAlchemy session."""

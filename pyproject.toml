@@ -11,6 +11,7 @@ dependencies = [
     "onnx>=1.14.0",
     "onnxruntime>=1.15.0,<1.24.0",
     "opencv-python>=4.8.0",
+    "pandas>=2.3.3",
     "pillow>=10.0.0",
     "prometheus-client>=0.17.0",
     "psycopg2-binary>=2.9.0",

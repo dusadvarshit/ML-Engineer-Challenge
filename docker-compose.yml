@@ -1,5 +1,6 @@
 services:
   ml-api:
+    image: ml-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -41,9 +42,7 @@ services:
       - app-network
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ml-api:latest
     container_name: celery-worker
     restart: unless-stopped
     command: ['celery', '-A', 'api.worker.celery_app', 'worker', '--loglevel=info', '--concurrency=2']
@@ -53,12 +52,22 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       REQUEST_USER_HEADER_NAME: X-User-Id
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  migrate:
+    image: ml-api:latest
+    profiles: ['migration']
+    command: ['alembic', 'upgrade', 'head']
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlchallenge
+    depends_on:
+      postgres:
         condition: service_healthy
     networks:
       - app-network

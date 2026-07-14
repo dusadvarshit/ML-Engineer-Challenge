@@ -26,7 +26,6 @@ def app(monkeypatch: pytest.MonkeyPatch):
     async def fake_cache_shutdown() -> None:
         return None
 
-    monkeypatch.setattr(main_module, 'init_database', lambda: None)
     monkeypatch.setattr(main_module.redis_cache_service, 'startup', fake_cache_startup)
     monkeypatch.setattr(main_module.redis_cache_service, 'shutdown', fake_cache_shutdown)
     monkeypatch.setattr(main_module.yolo_prediction_service, 'load', lambda: None)

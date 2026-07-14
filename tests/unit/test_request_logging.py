@@ -13,6 +13,7 @@ import api.worker as worker_module
 pytestmark = pytest.mark.unit
 
 
+
 def test_serialize_form_data_preserves_repeated_fields_and_files() -> None:
     """Multipart serialization should keep all repeated keys."""
 
@@ -71,6 +72,7 @@ def test_serialize_response_payload(
     ) == expected
 
 
+
 def test_extract_error_message_prefers_detail_field() -> None:
     """Error extraction should return the API detail when present."""
 
@@ -78,6 +80,7 @@ def test_extract_error_message_prefers_detail_field() -> None:
         request_logging_module._extract_error_message(b'{"detail":"bad request"}')
         == 'bad request'
     )
+
 
 
 def test_enqueue_request_log_swallows_broker_errors(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -92,24 +95,11 @@ def test_enqueue_request_log_swallows_broker_errors(monkeypatch: pytest.MonkeyPa
     request_logging_module._enqueue_request_log({'request_id': 'req-1'})
 
 
-def test_ensure_database_initialized_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Worker bootstrap should create tables once per process."""
-
-    calls = {'count': 0}
-    worker_module._database_initialized = False
-    monkeypatch.setattr(worker_module, 'init_database', lambda: calls.__setitem__('count', calls['count'] + 1))
-
-    worker_module.ensure_database_initialized()
-    worker_module.ensure_database_initialized()
-
-    assert calls['count'] == 1
-
 
 def test_persist_request_log_saves_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Celery task should initialize the database and persist the payload."""
+    """Celery task should delegate payload persistence."""
 
     captured: list[dict[str, object]] = []
-    monkeypatch.setattr(worker_module, 'ensure_database_initialized', lambda: None)
     monkeypatch.setattr(worker_module, 'save_request_log', lambda payload: captured.append(payload))
 
     worker_module.persist_request_log.run({'request_id': 'req-1', 'status_code': 200})

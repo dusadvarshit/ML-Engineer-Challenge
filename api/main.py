@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 
 from api.config import settings
-from api.database import init_database
 from api.metrics import instrument_http_request, metrics_response, set_dependency_status
 from api.middleware.request_logging import log_http_exchange
 from api.routers.classification import router as classification_router
@@ -19,7 +18,6 @@ from api.services.object_detection.yolo_service import yolo_prediction_service
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Load API resources before the application starts serving traffic."""
 
-    init_database()
     set_dependency_status(dependency='postgres', is_available=True)
     await redis_cache_service.startup()
     set_dependency_status(

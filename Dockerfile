@@ -45,6 +45,8 @@ RUN apt-get update \
     && chown -R app:app /app /opt/models /home/app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 COPY api ./api
 
 USER app

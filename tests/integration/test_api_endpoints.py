@@ -12,6 +12,7 @@ from api.routers import object_detection as router_module
 pytestmark = pytest.mark.integration
 
 
+
 def _patch_lifespan_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -24,7 +25,6 @@ def _patch_lifespan_dependencies(
     async def noop_async() -> None:
         return None
 
-    monkeypatch.setattr(main_module, 'init_database', lambda: None)
     monkeypatch.setattr(main_module.redis_cache_service, 'startup', startup or noop_async)
     monkeypatch.setattr(main_module.redis_cache_service, 'shutdown', shutdown or noop_async)
     monkeypatch.setattr(main_module.yolo_prediction_service, 'load', load or (lambda: None))
