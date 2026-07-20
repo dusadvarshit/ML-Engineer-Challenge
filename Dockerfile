@@ -48,6 +48,9 @@ COPY --from=builder /opt/venv /opt/venv
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY api ./api
+COPY --chown=app:app entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
 
 USER app
 
@@ -56,4 +59,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:8000/health" || exit 1
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
