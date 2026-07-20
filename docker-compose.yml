@@ -21,6 +21,8 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -53,6 +55,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       REQUEST_USER_HEADER_NAME: X-User-Id
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -62,7 +66,10 @@ services:
 
   migrate:
     image: ml-api:latest
-    profiles: ['migration']
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
     command: ['alembic', 'upgrade', 'head']
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlchallenge
