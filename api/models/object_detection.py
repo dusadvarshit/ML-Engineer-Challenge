@@ -1,5 +1,6 @@
 """Response models for object detection endpoints."""
 
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel
@@ -34,6 +35,8 @@ class ObjectDetection(BaseModel):
 class ObjectDetectionResponse(BaseModel):
     """Response payload for object detection predictions."""
 
+    model: ObjectDetectionModel
+    model_version: str
     detections: list[ObjectDetection]
 
 
@@ -49,3 +52,49 @@ class BatchObjectDetectionResponse(BaseModel):
 
     task: InferenceTask
     results: list[BatchObjectDetectionItem]
+
+
+class BatchJobStatus(str, Enum):
+    """Lifecycle states for a persisted asynchronous batch job."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
+
+class BatchJobItem(BaseModel):
+    """One item result, including a failure that did not fail the whole batch."""
+
+    filename: str
+    content_type: str | None = None
+    size_bytes: int
+    detections: list[ObjectDetection] | None = None
+    error: str | None = None
+
+
+class BatchJobAcceptedResponse(BaseModel):
+    """Response returned after a batch has been durably queued."""
+
+    job_id: str
+    status: BatchJobStatus
+    status_url: str
+    idempotent_replay: bool = False
+
+
+class BatchJobStatusResponse(BaseModel):
+    """Durable batch-job status and partial item results."""
+
+    job_id: str
+    task: InferenceTask
+    model: ObjectDetectionModel
+    model_version: str | None = None
+    status: BatchJobStatus
+    attempts: int
+    error: str | None = None
+    items: list[BatchJobItem]
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    expires_at: datetime | None = None

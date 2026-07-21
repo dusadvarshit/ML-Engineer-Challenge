@@ -1,0 +1,55 @@
+# Production overrides. Run with:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  ml-api:
+    restart: always
+    environment:
+      API_KEYS: ${API_KEYS:?Set API_KEYS to a JSON object of provisioned clients}
+      REQUEST_LOGGING_ENABLED: 'true'
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+  worker:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+  redis:
+    restart: always
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  prometheus:
+    restart: always
+  grafana:
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+  nginx:
+    restart: always
+volumes:
+  redis-data:

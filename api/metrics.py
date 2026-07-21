@@ -46,6 +46,11 @@ BATCH_SIZE = Histogram(
     ('task',),
     buckets=(1, 2, 4, 8, 16, 32),
 )
+BATCH_QUEUE_DEPTH = Gauge(
+    'ml_batch_queue_depth',
+    'Approximate number of waiting asynchronous batch inference jobs.',
+    ('queue',),
+)
 CACHE_OPERATIONS_TOTAL = Counter(
     'ml_cache_operations_total',
     'Total cache lookups and writes performed by the API.',
@@ -127,6 +132,12 @@ def observe_batch_request(*, task: str, batch_size: int, outcome: str) -> None:
 
     BATCH_REQUESTS_TOTAL.labels(task=task, outcome=outcome).inc()
     BATCH_SIZE.labels(task=task).observe(batch_size)
+
+
+def set_batch_queue_depth(*, queue: str, depth: int) -> None:
+    """Publish a best-effort Celery queue depth measurement."""
+
+    BATCH_QUEUE_DEPTH.labels(queue=queue).set(max(depth, 0))
 
 
 def observe_cache_operation(*, cache: str, operation: str, outcome: str) -> None:

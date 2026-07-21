@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from io import BytesIO
 from unittest.mock import AsyncMock
 
@@ -16,6 +17,10 @@ from api.services.cache_service import redis_cache_service
 from api.services.object_detection.yolo_service import yolo_prediction_service
 
 pytestmark = pytest.mark.unit
+
+VALID_IMAGE = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"
+)
 
 
 def _build_upload_file(
@@ -36,7 +41,7 @@ def _build_upload_file(
 def test_detect_objects_returns_cached_result_without_running_inference(mocker) -> None:
     """Cache hits should short-circuit the YOLO prediction call."""
 
-    image_bytes = b'cached-image'
+    image_bytes = VALID_IMAGE
     cached_detections = [
         ObjectDetection(
             x1=1.0,
@@ -78,7 +83,7 @@ def test_detect_objects_returns_cached_result_without_running_inference(mocker) 
 def test_detect_objects_caches_fresh_inference_result(mocker) -> None:
     """Cache misses should run inference and store the new detections."""
 
-    image_bytes = b'fresh-image'
+    image_bytes = VALID_IMAGE
     fresh_detections = [
         ObjectDetection(
             x1=10.0,
@@ -128,7 +133,7 @@ def test_detect_objects_caches_fresh_inference_result(mocker) -> None:
 def test_detect_objects_returns_result_when_cache_store_fails(mocker) -> None:
     """Cache write failures should not prevent returning fresh detections."""
 
-    image_bytes = b'fresh-image'
+    image_bytes = VALID_IMAGE
     fresh_detections = [
         ObjectDetection(
             x1=10.0,
@@ -178,7 +183,7 @@ def test_detect_objects_returns_result_when_cache_store_fails(mocker) -> None:
 def test_detect_objects_translates_service_errors(mocker, error_type: type[Exception]) -> None:
     """Inference failures should become HTTP 500 responses."""
 
-    image_bytes = b'broken-image'
+    image_bytes = VALID_IMAGE
 
     mocker.patch.object(
         yolo_prediction_service,
@@ -205,7 +210,7 @@ def test_detect_objects_translates_service_errors(mocker, error_type: type[Excep
 def test_batch_inference_returns_cached_results_without_running_batch_inference(mocker) -> None:
     """Full cache hits should short-circuit batch YOLO inference."""
 
-    payloads = [b'image-1', b'image-2']
+    payloads = [VALID_IMAGE, VALID_IMAGE]
     cached_batches = [
         [
             ObjectDetection(
@@ -267,7 +272,7 @@ def test_batch_inference_returns_cached_results_without_running_batch_inference(
 def test_batch_inference_only_runs_yolo_for_cache_misses_and_preserves_order(mocker) -> None:
     """Partial cache hits should infer only misses and merge results by original index."""
 
-    payloads = [b'image-1', b'image-2', b'image-3']
+    payloads = [VALID_IMAGE, VALID_IMAGE, VALID_IMAGE]
     files = [
         _build_upload_file(payloads[0], 'first.png'),
         _build_upload_file(payloads[1], 'second.png'),
@@ -358,7 +363,7 @@ def test_batch_inference_only_runs_yolo_for_cache_misses_and_preserves_order(moc
 def test_batch_inference_returns_fresh_results_when_cache_operations_fail(mocker) -> None:
     """Batch responses should still succeed when cache reads and writes degrade."""
 
-    payloads = [b'image-1', b'image-2']
+    payloads = [VALID_IMAGE, VALID_IMAGE]
     files = [
         _build_upload_file(payloads[0], 'first.png'),
         _build_upload_file(payloads[1], 'second.png'),
@@ -430,7 +435,7 @@ def test_batch_inference_returns_fresh_results_when_cache_operations_fail(mocker
 def test_batch_inference_rejects_batches_over_route_limit() -> None:
     """The route should enforce its tighter batch limit before inference."""
 
-    files = [_build_upload_file(b'image', f'image-{index}.png') for index in range(6)]
+    files = [_build_upload_file(VALID_IMAGE, f'image-{index}.png') for index in range(6)]
 
     with pytest.raises(HTTPException, match='Batch requests support up to 5 images') as exc_info:
         asyncio.run(batch_inference(task=InferenceTask.DETECT, files=files))
@@ -441,7 +446,7 @@ def test_batch_inference_rejects_batches_over_route_limit() -> None:
 def test_batch_inference_rejects_unimplemented_classification_task() -> None:
     """Batch classification should fail explicitly until it is implemented."""
 
-    files = [_build_upload_file(b'image', 'image-0.png')]
+    files = [_build_upload_file(VALID_IMAGE, 'image-0.png')]
 
     with pytest.raises(HTTPException, match='Batch classification is not supported yet') as exc_info:
         asyncio.run(batch_inference(task=InferenceTask.CLASSIFY, files=files))
@@ -453,7 +458,7 @@ def test_batch_inference_rejects_unimplemented_classification_task() -> None:
 def test_batch_inference_translates_service_errors(mocker, error_type: type[Exception]) -> None:
     """Batch inference failures should become HTTP 500 responses."""
 
-    files = [_build_upload_file(b'image', 'image-0.png')]
+    files = [_build_upload_file(VALID_IMAGE, 'image-0.png')]
 
     mocker.patch.object(
         yolo_prediction_service,
@@ -480,7 +485,7 @@ def test_batch_inference_translates_service_errors(mocker, error_type: type[Exce
 def test_read_image_bytes_rejects_missing_content_type() -> None:
     """Uploads without an image content type should be rejected."""
 
-    with pytest.raises(HTTPException, match='Uploaded file must be an image') as exc_info:
-        asyncio.run(_read_image_bytes(_build_upload_file(b'image', content_type=None)))
+    with pytest.raises(HTTPException, match='JPEG, PNG, or WebP') as exc_info:
+        asyncio.run(_read_image_bytes(_build_upload_file(VALID_IMAGE, content_type=None)))
 
-    assert exc_info.value.status_code == 400
+    assert exc_info.value.status_code == 415

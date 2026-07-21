@@ -3,8 +3,10 @@
 from time import perf_counter
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from api.config import settings
+from api.middleware.auth import require_api_key
 from api.metrics import observe_batch_request, observe_inference
 from api.models.object_detection import (
     BatchObjectDetectionItem,
@@ -20,20 +22,22 @@ from api.services.object_detection.registry import (
     get_object_detection_service,
 )
 from api.services.object_detection.yolo_service import yolo_prediction_service
+from api.utils.image_validation import read_validated_image
 
 MAX_BATCH_SIZE = 5
 
-router = APIRouter(tags=['object-detection'])
+router = APIRouter(tags=["object-detection"], dependencies=[Depends(require_api_key)])
 
 
-@router.post('/detect', response_model=ObjectDetectionResponse)
+@router.post("/detect", response_model=ObjectDetectionResponse)
 async def detect_objects(
     file: UploadFile = File(...),
-    model: Annotated[ObjectDetectionModel, Form()] = ObjectDetectionModel.YOLOV8N,
+    model: Annotated[ObjectDetectionModel | None, Form()] = None,
 ) -> ObjectDetectionResponse:
     """Run object detection on an uploaded image."""
 
     image_bytes = await _read_image_bytes(file)
+    model = model or ObjectDetectionModel(settings.get_default_object_detection_model())
     prediction_service = get_object_detection_service(model)
 
     try:
@@ -43,7 +47,11 @@ async def detect_objects(
             model_version,
         )
         if cached_detections is not None:
-            return ObjectDetectionResponse(detections=cached_detections)
+            return ObjectDetectionResponse(
+                model=model,
+                model_version=model_version,
+                detections=cached_detections,
+            )
 
         started_at = perf_counter()
         try:
@@ -52,7 +60,7 @@ async def detect_objects(
             observe_inference(
                 task=InferenceTask.DETECT.value,
                 model=model_version,
-                outcome='error',
+                outcome="error",
                 duration_seconds=perf_counter() - started_at,
             )
             raise
@@ -60,7 +68,7 @@ async def detect_objects(
         observe_inference(
             task=InferenceTask.DETECT.value,
             model=model_version,
-            outcome='success',
+            outcome="success",
             duration_seconds=perf_counter() - started_at,
         )
         await redis_cache_service.set_detection(
@@ -73,30 +81,35 @@ async def detect_objects(
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return ObjectDetectionResponse(detections=detections)
+    return ObjectDetectionResponse(
+        model=model,
+        model_version=model_version,
+        detections=detections,
+    )
 
 
-@router.post('/batch', response_model=BatchObjectDetectionResponse)
+@router.post("/batch", response_model=BatchObjectDetectionResponse)
 async def batch_inference(
     task: InferenceTask = Form(...),
     files: list[UploadFile] = File(...),
-    model: Annotated[ObjectDetectionModel, Form()] = ObjectDetectionModel.YOLOV8N,
+    model: Annotated[ObjectDetectionModel | None, Form()] = None,
 ) -> BatchObjectDetectionResponse:
     """Run batch inference for up to five uploaded images."""
 
     if len(files) > MAX_BATCH_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f'Batch requests support up to {MAX_BATCH_SIZE} images.',
+            detail=f"Batch requests support up to {MAX_BATCH_SIZE} images.",
         )
 
     if task is InferenceTask.CLASSIFY:
         raise HTTPException(
             status_code=501,
-            detail='Batch classification is not supported yet.',
+            detail="Batch classification is not supported yet.",
         )
 
-    outcome = 'success'
+    outcome = "success"
+    model = model or ObjectDetectionModel(settings.get_default_object_detection_model())
     prediction_service = get_object_detection_service(model)
 
     try:
@@ -108,10 +121,10 @@ async def batch_inference(
             prediction_service,
         )
     except FileNotFoundError as exc:
-        outcome = 'error'
+        outcome = "error"
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except RuntimeError as exc:
-        outcome = 'error'
+        outcome = "error"
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         observe_batch_request(
@@ -122,7 +135,7 @@ async def batch_inference(
 
     results = [
         BatchObjectDetectionItem(
-            filename=file.filename or 'uploaded-image',
+            filename=file.filename or "uploaded-image",
             detections=detections,
         )
         for file, detections in zip(files, batch_detections, strict=True)
@@ -138,7 +151,9 @@ async def _get_batch_detections(
 ) -> list[list[ObjectDetection]]:
     """Return detections for a batch while reusing per-image cache entries."""
 
-    detections_by_index: list[list[ObjectDetection] | None] = [None] * len(image_payloads)
+    detections_by_index: list[list[ObjectDetection] | None] = [None] * len(
+        image_payloads
+    )
     missed_indexes: list[int] = []
     missed_payloads: list[bytes] = []
 
@@ -157,12 +172,14 @@ async def _get_batch_detections(
     if missed_payloads:
         started_at = perf_counter()
         try:
-            fresh_detections = prediction_service.predict_batch_from_bytes(missed_payloads)
+            fresh_detections = prediction_service.predict_batch_from_bytes(
+                missed_payloads
+            )
         except (FileNotFoundError, RuntimeError):
             observe_inference(
                 task=InferenceTask.DETECT.value,
                 model=model_version,
-                outcome='error',
+                outcome="error",
                 duration_seconds=perf_counter() - started_at,
                 image_count=len(missed_payloads),
             )
@@ -171,7 +188,7 @@ async def _get_batch_detections(
         observe_inference(
             task=InferenceTask.DETECT.value,
             model=model_version,
-            outcome='success',
+            outcome="success",
             duration_seconds=perf_counter() - started_at,
             image_count=len(missed_payloads),
         )
@@ -194,10 +211,4 @@ async def _get_batch_detections(
 async def _read_image_bytes(file: UploadFile) -> bytes:
     """Validate an uploaded image and return its raw bytes."""
 
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(
-            status_code=400,
-            detail='Uploaded file must be an image.',
-        )
-
-    return await file.read()
+    return await read_validated_image(file)

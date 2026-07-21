@@ -12,7 +12,7 @@ import api.main as main_module
 from api.models.object_detection import ObjectDetection
 
 _SAMPLE_PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kB9sAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"
 )
 
 
@@ -26,9 +26,16 @@ def app(monkeypatch: pytest.MonkeyPatch):
     async def fake_cache_shutdown() -> None:
         return None
 
-    monkeypatch.setattr(main_module.redis_cache_service, 'startup', fake_cache_startup)
-    monkeypatch.setattr(main_module.redis_cache_service, 'shutdown', fake_cache_shutdown)
-    monkeypatch.setattr(main_module.yolo_prediction_service, 'load', lambda: None)
+    monkeypatch.setattr(main_module.redis_cache_service, "startup", fake_cache_startup)
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "shutdown", fake_cache_shutdown
+    )
+    monkeypatch.setattr(main_module.yolo_prediction_service, "load", lambda: None)
+    monkeypatch.setattr(
+        main_module.settings,
+        "API_KEYS",
+        '{"test-client":{"api_key":"test-api-key","tier":"standard"}}',
+    )
     return main_module.app
 
 
@@ -37,6 +44,7 @@ def client(app) -> Iterator[TestClient]:
     """Return a TestClient for the FastAPI app."""
 
     with TestClient(app) as test_client:
+        test_client.headers[main_module.settings.API_KEY_HEADER_NAME] = "test-api-key"
         yield test_client
 
 
@@ -52,11 +60,15 @@ def sample_upload_file(sample_image_bytes: bytes):
     """Build one multipart upload tuple for FastAPI client requests."""
 
     def build(
-        filename: str = 'image.png',
-        content_type: str = 'image/png',
+        filename: str = "image.png",
+        content_type: str = "image/png",
         payload: bytes | None = None,
     ) -> tuple[str, bytes, str]:
-        return (filename, sample_image_bytes if payload is None else payload, content_type)
+        return (
+            filename,
+            sample_image_bytes if payload is None else payload,
+            content_type,
+        )
 
     return build
 
@@ -65,7 +77,7 @@ def sample_upload_file(sample_image_bytes: bytes):
 def sample_text_bytes() -> bytes:
     """Return a non-image payload for validation tests."""
 
-    return b'plain-text-payload'
+    return b"plain-text-payload"
 
 
 @pytest.fixture
