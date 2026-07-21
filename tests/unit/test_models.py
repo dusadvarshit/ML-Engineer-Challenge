@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from api.models.classification import ClassificationPrediction, ClassificationResponse
+from api.models.classification import (
+    ClassificationPrediction,
+    ClassificationResponse,
+)
 from api.models.object_detection import (
     BatchObjectDetectionItem,
     BatchObjectDetectionResponse,
@@ -29,7 +32,11 @@ def test_object_detection_response_serializes_enum_and_payload() -> None:
     )
     response = BatchObjectDetectionResponse(
         task=InferenceTask.DETECT,
-        results=[BatchObjectDetectionItem(filename="image.png", detections=[detection])],
+        results=[
+            BatchObjectDetectionItem(
+                filename="image.png", detections=[detection]
+            )
+        ],
     )
 
     assert response.model_dump() == {

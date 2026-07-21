@@ -6,60 +6,66 @@ from collections.abc import Awaitable, Callable
 from time import perf_counter
 
 from fastapi import Request, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 HTTP_REQUESTS_TOTAL = Counter(
-    'ml_api_http_requests_total',
-    'Total HTTP requests served by the API.',
-    ('method', 'path', 'status'),
+    "ml_api_http_requests_total",
+    "Total HTTP requests served by the API.",
+    ("method", "path", "status"),
 )
 HTTP_REQUEST_EXCEPTIONS_TOTAL = Counter(
-    'ml_api_http_request_exceptions_total',
-    'Unhandled HTTP request exceptions raised by the API.',
-    ('method', 'path', 'exception_type'),
+    "ml_api_http_request_exceptions_total",
+    "Unhandled HTTP request exceptions raised by the API.",
+    ("method", "path", "exception_type"),
 )
 HTTP_REQUEST_DURATION_SECONDS = Histogram(
-    'ml_api_http_request_duration_seconds',
-    'End-to-end HTTP request latency in seconds.',
-    ('method', 'path'),
+    "ml_api_http_request_duration_seconds",
+    "End-to-end HTTP request latency in seconds.",
+    ("method", "path"),
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
 )
 MODEL_INFERENCE_REQUESTS_TOTAL = Counter(
-    'ml_model_inference_requests_total',
-    'Total model inference operations performed by the API.',
-    ('task', 'model', 'outcome'),
+    "ml_model_inference_requests_total",
+    "Total model inference operations performed by the API.",
+    ("task", "model", "outcome"),
 )
 MODEL_INFERENCE_DURATION_SECONDS = Histogram(
-    'ml_model_inference_duration_seconds',
-    'Time spent performing model inference in seconds.',
-    ('task', 'model', 'outcome'),
+    "ml_model_inference_duration_seconds",
+    "Time spent performing model inference in seconds.",
+    ("task", "model", "outcome"),
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
 )
 BATCH_REQUESTS_TOTAL = Counter(
-    'ml_batch_requests_total',
-    'Total batch inference jobs handled by the API.',
-    ('task', 'outcome'),
+    "ml_batch_requests_total",
+    "Total batch inference jobs handled by the API.",
+    ("task", "outcome"),
 )
 BATCH_SIZE = Histogram(
-    'ml_batch_size',
-    'Number of images processed in each batch inference job.',
-    ('task',),
+    "ml_batch_size",
+    "Number of images processed in each batch inference job.",
+    ("task",),
     buckets=(1, 2, 4, 8, 16, 32),
 )
 BATCH_QUEUE_DEPTH = Gauge(
-    'ml_batch_queue_depth',
-    'Approximate number of waiting asynchronous batch inference jobs.',
-    ('queue',),
+    "ml_batch_queue_depth",
+    "Approximate number of waiting asynchronous batch inference jobs.",
+    ("queue",),
 )
 CACHE_OPERATIONS_TOTAL = Counter(
-    'ml_cache_operations_total',
-    'Total cache lookups and writes performed by the API.',
-    ('cache', 'operation', 'outcome'),
+    "ml_cache_operations_total",
+    "Total cache lookups and writes performed by the API.",
+    ("cache", "operation", "outcome"),
 )
 DEPENDENCY_UP = Gauge(
-    'ml_dependency_up',
-    'Whether a serving dependency is currently available.',
-    ('dependency',),
+    "ml_dependency_up",
+    "Whether a serving dependency is currently available.",
+    ("dependency",),
 )
 
 
@@ -87,7 +93,9 @@ async def instrument_http_request(
             path=path,
             exception_type=type(exc).__name__,
         ).inc()
-        HTTP_REQUESTS_TOTAL.labels(method=method, path=path, status='500').inc()
+        HTTP_REQUESTS_TOTAL.labels(
+            method=method, path=path, status="500"
+        ).inc()
         HTTP_REQUEST_DURATION_SECONDS.labels(method=method, path=path).observe(
             perf_counter() - started_at
         )
@@ -140,7 +148,9 @@ def set_batch_queue_depth(*, queue: str, depth: int) -> None:
     BATCH_QUEUE_DEPTH.labels(queue=queue).set(max(depth, 0))
 
 
-def observe_cache_operation(*, cache: str, operation: str, outcome: str) -> None:
+def observe_cache_operation(
+    *, cache: str, operation: str, outcome: str
+) -> None:
     """Record cache lookup and write outcomes."""
 
     CACHE_OPERATIONS_TOTAL.labels(
@@ -159,8 +169,8 @@ def set_dependency_status(*, dependency: str, is_available: bool) -> None:
 def _resolve_path_template(request: Request) -> str:
     """Return a low-cardinality path label for one request."""
 
-    route = request.scope.get('route')
-    route_path = getattr(route, 'path', None)
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", None)
     if route_path:
         return route_path
     return request.url.path

@@ -43,8 +43,12 @@ class Settings:
     REQUEST_LOG_MAX_BODY_LENGTH: int = int(
         os.getenv("REQUEST_LOG_MAX_BODY_LENGTH", "2048")
     )
-    REQUEST_ID_HEADER_NAME: str = os.getenv("REQUEST_ID_HEADER_NAME", "X-Request-Id")
-    REQUEST_USER_HEADER_NAME: str = os.getenv("REQUEST_USER_HEADER_NAME", "X-User-Id")
+    REQUEST_ID_HEADER_NAME: str = os.getenv(
+        "REQUEST_ID_HEADER_NAME", "X-Request-Id"
+    )
+    REQUEST_USER_HEADER_NAME: str = os.getenv(
+        "REQUEST_USER_HEADER_NAME", "X-User-Id"
+    )
     API_KEY_HEADER_NAME: str = os.getenv("API_KEY_HEADER_NAME", "X-API-Key")
     API_KEYS: str = os.getenv("API_KEYS", "")
     RATE_LIMITS_PER_MINUTE: str = os.getenv(
@@ -54,7 +58,9 @@ class Settings:
 
     MODEL_CACHE_TTL: int = 3600
     MAX_BATCH_SIZE: int = 32
-    BATCH_RESULT_TTL_SECONDS: int = int(os.getenv("BATCH_RESULT_TTL_SECONDS", "86400"))
+    BATCH_RESULT_TTL_SECONDS: int = int(
+        os.getenv("BATCH_RESULT_TTL_SECONDS", "86400")
+    )
     BATCH_TASK_TIME_LIMIT_SECONDS: int = int(
         os.getenv("BATCH_TASK_TIME_LIMIT_SECONDS", "300")
     )
@@ -135,11 +141,17 @@ class Settings:
                 )
             api_key = value.get("api_key")
             tier = value.get("tier", "standard")
-            if not isinstance(api_key, str) or not api_key or not isinstance(tier, str):
+            if (
+                not isinstance(api_key, str)
+                or not api_key
+                or not isinstance(tier, str)
+            ):
                 raise ValueError(
                     "Each API_KEYS entry requires api_key and optional tier strings."
                 )
-            clients.append(ApiClient(client_id=client_id, api_key=api_key, tier=tier))
+            clients.append(
+                ApiClient(client_id=client_id, api_key=api_key, tier=tier)
+            )
         return tuple(clients)
 
     def get_rate_limits(self) -> dict[str, int]:
@@ -149,7 +161,9 @@ class Settings:
         for item in self.RATE_LIMITS_PER_MINUTE.split(","):
             tier, separator, raw_limit = item.partition(":")
             if not separator or not tier or not raw_limit:
-                raise ValueError("RATE_LIMITS_PER_MINUTE must use tier:limit pairs.")
+                raise ValueError(
+                    "RATE_LIMITS_PER_MINUTE must use tier:limit pairs."
+                )
             limit = int(raw_limit)
             if limit <= 0:
                 raise ValueError("Rate limits must be positive integers.")

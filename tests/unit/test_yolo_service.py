@@ -54,19 +54,25 @@ class FakeModel:
         return self.results
 
 
-def test_predict_returns_first_batch_result(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_predict_returns_first_batch_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Single-image predictions should unwrap the first batch response."""
 
     service = YoloPredictionService()
     expected = [[{"mock": "detection"}], []]
-    monkeypatch.setattr(service, "predict_batch_from_bytes", lambda _: expected)
+    monkeypatch.setattr(
+        service, "predict_batch_from_bytes", lambda _: expected
+    )
 
     result = service.predict(b"image-bytes")
 
     assert result == expected[0]
 
 
-def test_predict_batch_from_bytes_decodes_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_predict_batch_from_bytes_decodes_all_images(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Raw batch payloads should be decoded before batch inference."""
 
     service = YoloPredictionService()
@@ -75,9 +81,11 @@ def test_predict_batch_from_bytes_decodes_all_images(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         service,
         "_decode_image",
-        lambda image_bytes: decoded_images[0] if image_bytes == b"one" else decoded_images[1],
+        lambda image_bytes: (
+            decoded_images[0] if image_bytes == b"one" else decoded_images[1]
+        ),
     )
-    predict_batch = monkeypatch.setattr(
+    monkeypatch.setattr(
         service,
         "predict_batch",
         lambda images: [list(images)],
@@ -107,7 +115,9 @@ def test_decode_image_returns_rgb_image(sample_image_bytes: bytes) -> None:
     assert image.size == (1, 1)
 
 
-def test_resolve_model_path_prefers_sorted_checkpoint_files(tmp_path: Path) -> None:
+def test_resolve_model_path_prefers_sorted_checkpoint_files(
+    tmp_path: Path,
+) -> None:
     """The service should return the first sorted PyTorch checkpoint path."""
 
     service = YoloPredictionService()
@@ -115,7 +125,9 @@ def test_resolve_model_path_prefers_sorted_checkpoint_files(tmp_path: Path) -> N
     first_checkpoint = tmp_path / "alpha.pt"
     first_checkpoint.write_bytes(b"checkpoint")
 
-    from api.services.object_detection import yolo_service as yolo_service_module
+    from api.services.object_detection import (
+        yolo_service as yolo_service_module,
+    )
 
     original_dir = yolo_service_module.settings.YOLO_MODEL_DIR
     yolo_service_module.settings.YOLO_MODEL_DIR = tmp_path
@@ -127,17 +139,23 @@ def test_resolve_model_path_prefers_sorted_checkpoint_files(tmp_path: Path) -> N
     assert resolved == first_checkpoint
 
 
-def test_resolve_model_path_raises_when_no_checkpoint_exists(tmp_path: Path) -> None:
+def test_resolve_model_path_raises_when_no_checkpoint_exists(
+    tmp_path: Path,
+) -> None:
     """The service should raise a clear error when no YOLO checkpoint exists."""
 
     service = YoloPredictionService()
 
-    from api.services.object_detection import yolo_service as yolo_service_module
+    from api.services.object_detection import (
+        yolo_service as yolo_service_module,
+    )
 
     original_dir = yolo_service_module.settings.YOLO_MODEL_DIR
     yolo_service_module.settings.YOLO_MODEL_DIR = tmp_path
     try:
-        with pytest.raises(FileNotFoundError, match="No PyTorch YOLO checkpoint found"):
+        with pytest.raises(
+            FileNotFoundError, match="No PyTorch YOLO checkpoint found"
+        ):
             service._resolve_model_path()
     finally:
         yolo_service_module.settings.YOLO_MODEL_DIR = original_dir
@@ -173,7 +191,9 @@ def test_load_warms_up_loaded_model(monkeypatch: pytest.MonkeyPatch) -> None:
     warmup_calls = []
 
     monkeypatch.setattr(service, "_load_model", lambda: fake_model)
-    monkeypatch.setattr(service, "_warm_up", lambda model: warmup_calls.append(model))
+    monkeypatch.setattr(
+        service, "_warm_up", lambda model: warmup_calls.append(model)
+    )
 
     service.load()
 
@@ -188,23 +208,35 @@ def test_get_model_version_falls_back_to_model_filename() -> None:
     assert service._format_model_version(Path("model.pt")) == "model.pt"
 
 
-def test_get_model_version_uses_cached_model_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_model_version_uses_cached_model_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Model version should not resolve the filesystem again once the model path is cached."""
 
     service = YoloPredictionService()
-    service._model_path = Path("models/artifacts/object_detection/yolov8n/v1.0.0/pytorch/model.pt")
+    service._model_path = Path(
+        "models/artifacts/object_detection/yolov8n/v1.0.0/pytorch/model.pt"
+    )
 
-    monkeypatch.setattr(service, "_resolve_model_path", lambda: (_ for _ in ()).throw(AssertionError))
+    monkeypatch.setattr(
+        service,
+        "_resolve_model_path",
+        lambda: (_ for _ in ()).throw(AssertionError),
+    )
 
     assert service.get_model_version() == "yolov8n-v1.0.0-model.pt"
 
 
-def test_normalize_result_uses_defaults_when_confidence_or_class_missing() -> None:
+def test_normalize_result_uses_defaults_when_confidence_or_class_missing() -> (
+    None
+):
     """Missing optional result data should fall back to API-safe defaults."""
 
     service = YoloPredictionService()
 
-    detections = service._normalize_result(FakeResult(FakeBoxes([[1, 2, 3, 4]])))
+    detections = service._normalize_result(
+        FakeResult(FakeBoxes([[1, 2, 3, 4]]))
+    )
 
     assert detections[0].confidence == 0.0
     assert detections[0].class_id == -1
@@ -233,7 +265,9 @@ def test_warm_up_runs_only_once() -> None:
     assert service._is_warmed_up is True
 
 
-def test_load_model_raises_runtime_error_when_ultralytics_is_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_model_raises_runtime_error_when_ultralytics_is_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Missing Ultralytics should produce a serving-friendly runtime error."""
 
     service = YoloPredictionService()
@@ -256,7 +290,9 @@ def test_load_model_raises_runtime_error_when_ultralytics_is_missing(monkeypatch
         service._load_model()
 
 
-def test_load_model_caches_loaded_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_model_caches_loaded_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """The service should instantiate the YOLO model once and reuse it."""
 
     service = YoloPredictionService()

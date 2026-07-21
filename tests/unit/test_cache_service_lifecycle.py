@@ -39,7 +39,9 @@ def test_startup_marks_service_available_when_ping_succeeds(mocker) -> None:
     """Successful Redis startup should retain the live client."""
 
     client = HealthyRedisClient()
-    mocker.patch("api.services.cache_service.Redis.from_url", return_value=client)
+    mocker.patch(
+        "api.services.cache_service.Redis.from_url", return_value=client
+    )
 
     service = RedisCacheService()
 

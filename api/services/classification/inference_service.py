@@ -21,8 +21,9 @@ class ClassificationUnavailableError(RuntimeError):
 class ClassificationPredictor(Protocol):
     """Contract implemented by a deployment-specific model adapter."""
 
-    def __call__(self, image_bytes: bytes, top_k: int) -> list[ClassificationPrediction]:
-        ...
+    def __call__(
+        self, image_bytes: bytes, top_k: int
+    ) -> list[ClassificationPrediction]: ...
 
 
 class ClassificationPredictionService:
@@ -41,7 +42,9 @@ class ClassificationPredictionService:
 
         self._predictor = None
 
-    def predict(self, image_bytes: bytes, top_k: int) -> list[ClassificationPrediction]:
+    def predict(
+        self, image_bytes: bytes, top_k: int
+    ) -> list[ClassificationPrediction]:
         """Classify one validated image or report that serving is unavailable."""
 
         if not self.is_available:

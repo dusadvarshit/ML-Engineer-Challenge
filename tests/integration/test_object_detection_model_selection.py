@@ -8,7 +8,9 @@ import pytest
 
 from api.models.object_detection import ObjectDetection
 from api.services.object_detection.detr_service import detr_prediction_service
-from api.services.object_detection.retinanet_service import retinanet_prediction_service
+from api.services.object_detection.retinanet_service import (
+    retinanet_prediction_service,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -117,5 +119,10 @@ def test_batch_endpoint_routes_request_to_retinanet_model(
     assert response.status_code == 200
     payload = response.json()
     assert payload["task"] == "detect"
-    assert [item["filename"] for item in payload["results"]] == ["first.png", "second.png"]
-    assert [item["detections"][0]["class_id"] for item in payload["results"]] == [3, 4]
+    assert [item["filename"] for item in payload["results"]] == [
+        "first.png",
+        "second.png",
+    ]
+    assert [
+        item["detections"][0]["class_id"] for item in payload["results"]
+    ] == [3, 4]

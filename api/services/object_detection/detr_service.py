@@ -31,17 +31,23 @@ class DetrPredictionService:
         self,
         image_payloads: list[bytes],
     ) -> list[list[ObjectDetection]]:
-        images = [self._decode_image(image_bytes) for image_bytes in image_payloads]
+        images = [
+            self._decode_image(image_bytes) for image_bytes in image_payloads
+        ]
         return self.predict_batch(images)
 
-    def predict_batch(self, images: list[PILImage]) -> list[list[ObjectDetection]]:
+    def predict_batch(
+        self, images: list[PILImage]
+    ) -> list[list[ObjectDetection]]:
         if not images:
             return []
 
         model, processor = self._load_model()
         torch = self._load_torch()
         inputs = processor(images=images, return_tensors="pt")
-        target_sizes = torch.tensor([[image.height, image.width] for image in images])
+        target_sizes = torch.tensor(
+            [[image.height, image.width] for image in images]
+        )
 
         with self._no_grad(torch):
             outputs = model(**inputs)
@@ -70,7 +76,10 @@ class DetrPredictionService:
         return torch
 
     def _load_runtime_dependencies(self) -> tuple[Any, Any]:
-        from transformers import AutoImageProcessor, AutoModelForObjectDetection
+        from transformers import (
+            AutoImageProcessor,
+            AutoModelForObjectDetection,
+        )
 
         return AutoImageProcessor, AutoModelForObjectDetection
 
@@ -118,7 +127,9 @@ class DetrPredictionService:
             model_dir / "model.safetensors",
             model_dir / "preprocessor_config.json",
         ]
-        missing_files = [path.name for path in required_files if not path.exists()]
+        missing_files = [
+            path.name for path in required_files if not path.exists()
+        ]
         if missing_files:
             raise FileNotFoundError(
                 f"Missing DETR model artifacts in {model_dir}: {', '.join(missing_files)}"
@@ -133,7 +144,9 @@ class DetrPredictionService:
 
         return model_path.name
 
-    def _normalize_result(self, result: dict[str, Any]) -> list[ObjectDetection]:
+    def _normalize_result(
+        self, result: dict[str, Any]
+    ) -> list[ObjectDetection]:
         boxes = result.get("boxes")
         if boxes is None:
             return []
@@ -152,8 +165,14 @@ class DetrPredictionService:
                     y1=float(coords[1]),
                     x2=float(coords[2]),
                     y2=float(coords[3]),
-                    confidence=float(confidences[index]) if index < len(confidences) else 0.0,
-                    class_id=int(class_ids[index]) if index < len(class_ids) else -1,
+                    confidence=(
+                        float(confidences[index])
+                        if index < len(confidences)
+                        else 0.0
+                    ),
+                    class_id=(
+                        int(class_ids[index]) if index < len(class_ids) else -1
+                    ),
                 )
             )
 

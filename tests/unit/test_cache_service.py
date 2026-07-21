@@ -57,7 +57,9 @@ def test_startup_degrades_gracefully_when_redis_is_unavailable(mocker) -> None:
     """Redis startup failure should not leave the service in an active state."""
 
     client = FakeRedisClient(ping_error=RedisError("redis down"))
-    mocker.patch("api.services.cache_service.Redis.from_url", return_value=client)
+    mocker.patch(
+        "api.services.cache_service.Redis.from_url", return_value=client
+    )
 
     service = RedisCacheService()
 
@@ -134,7 +136,9 @@ def test_get_detection_returns_none_for_invalid_cached_payload() -> None:
     client = FakeRedisClient()
     service._client = client
     service._is_available = True
-    client.values[service.build_detection_key(b"image", "version")] = "not-json"
+    client.values[service.build_detection_key(b"image", "version")] = (
+        "not-json"
+    )
 
     cached = asyncio.run(service.get_detection(b"image", "version"))
 
@@ -156,7 +160,9 @@ def test_set_detection_returns_false_when_cache_unavailable() -> None:
         )
     ]
 
-    stored = asyncio.run(service.set_detection(b"image", "version", detections))
+    stored = asyncio.run(
+        service.set_detection(b"image", "version", detections)
+    )
 
     assert stored is False
 
@@ -180,7 +186,9 @@ def test_set_detection_returns_false_when_redis_write_fails() -> None:
         )
     ]
 
-    stored = asyncio.run(service.set_detection(b"image", "version", detections))
+    stored = asyncio.run(
+        service.set_detection(b"image", "version", detections)
+    )
 
     assert stored is False
 
@@ -204,10 +212,14 @@ def test_set_and_get_detection_round_trip() -> None:
         )
     ]
 
-    stored = asyncio.run(service.set_detection(image_bytes, model_version, detections))
+    stored = asyncio.run(
+        service.set_detection(image_bytes, model_version, detections)
+    )
     cached = asyncio.run(service.get_detection(image_bytes, model_version))
 
     assert stored is True
     assert cached is not None
-    assert [item.model_dump() for item in cached] == [item.model_dump() for item in detections]
+    assert [item.model_dump() for item in cached] == [
+        item.model_dump() for item in detections
+    ]
     assert service._client.setex_calls[0][1] == settings.MODEL_CACHE_TTL

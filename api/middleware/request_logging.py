@@ -26,7 +26,9 @@ async def log_http_exchange(
     if not settings.REQUEST_LOGGING_ENABLED:
         return await call_next(request)
 
-    request_id = request.headers.get(settings.REQUEST_ID_HEADER_NAME) or str(uuid4())
+    request_id = request.headers.get(settings.REQUEST_ID_HEADER_NAME) or str(
+        uuid4()
+    )
     request.state.request_id = request_id
 
     raw_body = await request.body()
@@ -113,7 +115,9 @@ def _reset_request_body(request: Request, raw_body: bytes) -> None:
     request._receive = receive
 
 
-async def _build_request_payload(request: Request, raw_body: bytes) -> dict[str, Any]:
+async def _build_request_payload(
+    request: Request, raw_body: bytes
+) -> dict[str, Any]:
     """Serialize one inbound request into a JSON-safe structure."""
 
     payload: dict[str, Any] = {
@@ -139,7 +143,9 @@ async def _build_request_payload(request: Request, raw_body: bytes) -> dict[str,
         payload.update(_serialize_form_data(form))
         return payload
 
-    payload["body_preview"] = _truncate_text(raw_body.decode("utf-8", errors="replace"))
+    payload["body_preview"] = _truncate_text(
+        raw_body.decode("utf-8", errors="replace")
+    )
     return payload
 
 
@@ -150,7 +156,9 @@ def _parse_json_body(raw_body: bytes) -> Any:
         return _sanitize_value(json.loads(raw_body))
     except json.JSONDecodeError:
         return {
-            "body_preview": _truncate_text(raw_body.decode("utf-8", errors="replace"))
+            "body_preview": _truncate_text(
+                raw_body.decode("utf-8", errors="replace")
+            )
         }
 
 
@@ -216,11 +224,15 @@ async def _capture_response_body(response: Response) -> bytes:
     if body is not None:
         return body
 
+    body_iterator = getattr(response, "body_iterator", None)
+    if body_iterator is None:
+        return b""
+
     chunks: list[bytes] = []
-    async for chunk in response.body_iterator:
+    async for chunk in body_iterator:
         chunks.append(chunk)
 
-    response.body_iterator = iterate_in_threadpool(iter(chunks))
+    setattr(response, "body_iterator", iterate_in_threadpool(iter(chunks)))
     return b"".join(chunks)
 
 
@@ -232,17 +244,25 @@ def _serialize_response_payload(
     if not body:
         return None
 
-    normalized_content_type = (content_type or "").split(";", 1)[0].strip().lower()
+    normalized_content_type = (
+        (content_type or "").split(";", 1)[0].strip().lower()
+    )
     if normalized_content_type == "application/json":
         try:
             return _sanitize_value(json.loads(body))
         except json.JSONDecodeError:
             return {
-                "body_preview": _truncate_text(body.decode("utf-8", errors="replace"))
+                "body_preview": _truncate_text(
+                    body.decode("utf-8", errors="replace")
+                )
             }
 
     if normalized_content_type.startswith("text/"):
-        return {"body_preview": _truncate_text(body.decode("utf-8", errors="replace"))}
+        return {
+            "body_preview": _truncate_text(
+                body.decode("utf-8", errors="replace")
+            )
+        }
 
     return {"size_bytes": len(body)}
 

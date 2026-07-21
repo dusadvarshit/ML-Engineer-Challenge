@@ -40,7 +40,9 @@ def test_detect_endpoint_translates_service_errors_to_http_500(
     )
 
     assert response.status_code == 500
-    assert response.json() == {"error": {"code": "inference_failed", "message": "service failed"}}
+    assert response.json() == {
+        "error": {"code": "inference_failed", "message": "service failed"}
+    }
 
 
 def test_detect_endpoint_rejects_non_image_uploads(
@@ -52,11 +54,20 @@ def test_detect_endpoint_rejects_non_image_uploads(
 
     response = client.post(
         "/api/v1/detect",
-        files={"file": sample_upload_file("notes.txt", "text/plain", sample_text_bytes)},
+        files={
+            "file": sample_upload_file(
+                "notes.txt", "text/plain", sample_text_bytes
+            )
+        },
     )
 
     assert response.status_code == 415
-    assert response.json() == {"error": {"code": "unsupported_media_type", "message": "Uploaded file must be a JPEG, PNG, or WebP image."}}
+    assert response.json() == {
+        "error": {
+            "code": "unsupported_media_type",
+            "message": "Uploaded file must be a JPEG, PNG, or WebP image.",
+        }
+    }
 
 
 def test_detect_endpoint_returns_empty_detection_list_when_model_finds_nothing(
@@ -93,4 +104,8 @@ def test_detect_endpoint_returns_empty_detection_list_when_model_finds_nothing(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"model": "yolov8n", "model_version": "yolov8n-v1.0.0-best.pt", "detections": []}
+    assert response.json() == {
+        "model": "yolov8n",
+        "model_version": "yolov8n-v1.0.0-best.pt",
+        "detections": [],
+    }

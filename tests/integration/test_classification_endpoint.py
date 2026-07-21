@@ -6,6 +6,7 @@ import pytest
 
 from api.config import settings
 from api.models.classification import ClassificationPrediction
+from api.routers import classification as router_module
 from api.services.classification import classification_prediction_service
 
 pytestmark = pytest.mark.integration
@@ -45,6 +46,12 @@ def test_classify_returns_adapter_predictions(
             ClassificationPrediction(class_id=0, label="cat", confidence=0.9)
         ][:top_k],
     )
+    observations: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        router_module,
+        "observe_inference",
+        lambda **kwargs: observations.append(kwargs),
+    )
 
     response = client.post(
         "/api/v1/classify",
@@ -58,6 +65,8 @@ def test_classify_returns_adapter_predictions(
         "model_version": "test-v1",
         "predictions": [{"class_id": 0, "label": "cat", "confidence": 0.9}],
     }
+    assert observations[0]["task"] == "classify"
+    assert observations[0]["outcome"] == "success"
 
 
 def test_classify_rejects_unconfigured_model(
@@ -81,12 +90,16 @@ def test_classify_rejects_unconfigured_model(
     }
 
 
-def test_classify_uses_shared_image_validation(client, sample_upload_file) -> None:
+def test_classify_uses_shared_image_validation(
+    client, sample_upload_file
+) -> None:
     """Classification should reject unsupported upload content types before inference."""
 
     response = client.post(
         "/api/v1/classify",
-        files={"file": sample_upload_file("document.txt", "text/plain", b"text")},
+        files={
+            "file": sample_upload_file("document.txt", "text/plain", b"text")
+        },
     )
 
     assert response.status_code == 415

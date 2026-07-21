@@ -44,7 +44,9 @@ def _run_compose(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _wait_for_http_ready(url: str, *, timeout_seconds: float) -> httpx.Response:
+def _wait_for_http_ready(
+    url: str, *, timeout_seconds: float
+) -> httpx.Response:
     """Poll one HTTP endpoint until it returns a success response."""
 
     deadline = time.monotonic() + timeout_seconds
@@ -62,7 +64,9 @@ def _wait_for_http_ready(url: str, *, timeout_seconds: float) -> httpx.Response:
             time.sleep(2.0)
 
     if last_error is not None:
-        raise AssertionError(f"Timed out waiting for {url}: {last_error}") from last_error
+        raise AssertionError(
+            f"Timed out waiting for {url}: {last_error}"
+        ) from last_error
     raise AssertionError(f"Timed out waiting for {url}")
 
 
@@ -74,15 +78,24 @@ def e2e_endpoints() -> dict[str, str]:
     if base_url:
         return {
             "base_url": base_url.rstrip("/"),
-            "prometheus_url": os.getenv("E2E_PROMETHEUS_URL", _DEFAULT_PROMETHEUS_URL).rstrip("/"),
-            "grafana_url": os.getenv("E2E_GRAFANA_URL", _DEFAULT_GRAFANA_URL).rstrip("/"),
-            "grafana_user": os.getenv("E2E_GRAFANA_USER", _DEFAULT_GRAFANA_USER),
-            "grafana_password": os.getenv("E2E_GRAFANA_PASSWORD", _DEFAULT_GRAFANA_PASSWORD),
+            "prometheus_url": os.getenv(
+                "E2E_PROMETHEUS_URL", _DEFAULT_PROMETHEUS_URL
+            ).rstrip("/"),
+            "grafana_url": os.getenv(
+                "E2E_GRAFANA_URL", _DEFAULT_GRAFANA_URL
+            ).rstrip("/"),
+            "grafana_user": os.getenv(
+                "E2E_GRAFANA_USER", _DEFAULT_GRAFANA_USER
+            ),
+            "grafana_password": os.getenv(
+                "E2E_GRAFANA_PASSWORD", _DEFAULT_GRAFANA_PASSWORD
+            ),
         }
 
     if os.getenv("E2E_MANAGE_STACK") != "1":
         pytest.skip(
-            "Set E2E_BASE_URL to target an existing stack or E2E_MANAGE_STACK=1 to run docker compose."
+            "Set E2E_BASE_URL to target an existing stack or "
+            "E2E_MANAGE_STACK=1 to run docker compose."
         )
 
     if shutil.which("docker") is None:
@@ -126,7 +139,9 @@ def e2e_endpoints() -> dict[str, str]:
         _run_compose("down", "-v", "--remove-orphans")
 
 
-def test_nginx_health_endpoint_returns_ok(e2e_endpoints: dict[str, str]) -> None:
+def test_nginx_health_endpoint_returns_ok(
+    e2e_endpoints: dict[str, str],
+) -> None:
     """Nginx should expose the API health endpoint under the prefixed route."""
 
     response = httpx.get(
@@ -138,7 +153,9 @@ def test_nginx_health_endpoint_returns_ok(e2e_endpoints: dict[str, str]) -> None
     assert response.json() == {"status": "ok"}
 
 
-def test_metrics_endpoint_exposes_prometheus_payload(e2e_endpoints: dict[str, str]) -> None:
+def test_metrics_endpoint_exposes_prometheus_payload(
+    e2e_endpoints: dict[str, str],
+) -> None:
     """The stack should expose the Prometheus scrape payload through nginx."""
 
     response = httpx.get(
@@ -152,7 +169,9 @@ def test_metrics_endpoint_exposes_prometheus_payload(e2e_endpoints: dict[str, st
     assert "ml_dependency_up" in response.text
 
 
-def test_prometheus_container_is_healthy(e2e_endpoints: dict[str, str]) -> None:
+def test_prometheus_container_is_healthy(
+    e2e_endpoints: dict[str, str],
+) -> None:
     """The Prometheus service should come up alongside the serving stack."""
 
     response = httpx.get(
@@ -174,23 +193,27 @@ def test_grafana_container_is_healthy(e2e_endpoints: dict[str, str]) -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload['database'] == 'ok'
+    assert payload["database"] == "ok"
 
 
-
-def test_grafana_has_prometheus_datasource(e2e_endpoints: dict[str, str]) -> None:
+def test_grafana_has_prometheus_datasource(
+    e2e_endpoints: dict[str, str],
+) -> None:
     """Grafana should provision the Prometheus datasource automatically."""
 
     response = httpx.get(
         f"{e2e_endpoints['grafana_url']}/api/datasources/name/Prometheus",
-        auth=(e2e_endpoints['grafana_user'], e2e_endpoints['grafana_password']),
+        auth=(
+            e2e_endpoints["grafana_user"],
+            e2e_endpoints["grafana_password"],
+        ),
         timeout=_REQUEST_TIMEOUT_SECONDS,
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload['type'] == 'prometheus'
-    assert payload['url'] == 'http://prometheus:9090'
+    assert payload["type"] == "prometheus"
+    assert payload["url"] == "http://prometheus:9090"
 
 
 def test_detect_endpoint_accepts_real_image_upload(

@@ -75,7 +75,9 @@ def test_health_check_returns_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_models_endpoint_reports_public_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_models_endpoint_reports_public_readiness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Model discovery must not expose artifact paths to callers."""
 
     _patch_lifespan_dependencies(monkeypatch)
@@ -92,12 +94,16 @@ def test_models_endpoint_reports_public_readiness(monkeypatch: pytest.MonkeyPatc
     assert response.json() == {"models": []}
 
 
-def test_readiness_reports_degraded_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readiness_reports_degraded_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Readiness is dependency-aware while /health remains liveness-only."""
 
     _patch_lifespan_dependencies(monkeypatch)
     monkeypatch.setattr(main_module, "_database_is_available", lambda: False)
-    monkeypatch.setattr(main_module.redis_cache_service, "_is_available", False)
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "_is_available", False
+    )
     monkeypatch.setattr(main_module.yolo_prediction_service, "_model", None)
 
     with TestClient(main_module.app) as client:
@@ -106,7 +112,11 @@ def test_readiness_reports_degraded_dependencies(monkeypatch: pytest.MonkeyPatch
     assert response.status_code == 503
     assert response.json() == {
         "status": "degraded",
-        "dependencies": {"postgres": False, "redis": False, "yolo_model": False},
+        "dependencies": {
+            "postgres": False,
+            "redis": False,
+            "yolo_model": False,
+        },
     }
 
 
@@ -136,7 +146,8 @@ def test_health_request_increments_http_metrics(
     request_labels = {"method": "GET", "path": "/health", "status": "200"}
     duration_labels = {"method": "GET", "path": "/health"}
     before_requests = (
-        REGISTRY.get_sample_value("ml_api_http_requests_total", request_labels) or 0.0
+        REGISTRY.get_sample_value("ml_api_http_requests_total", request_labels)
+        or 0.0
     )
     before_duration_count = (
         REGISTRY.get_sample_value(
@@ -149,7 +160,8 @@ def test_health_request_increments_http_metrics(
         response = client.get("/health")
 
     after_requests = (
-        REGISTRY.get_sample_value("ml_api_http_requests_total", request_labels) or 0.0
+        REGISTRY.get_sample_value("ml_api_http_requests_total", request_labels)
+        or 0.0
     )
     after_duration_count = (
         REGISTRY.get_sample_value(
@@ -193,7 +205,9 @@ def test_lifespan_initializes_and_closes_dependencies_once(
     assert calls == {"startup": 1, "load": 1, "shutdown": 1}
 
 
-def test_health_request_enqueues_request_log(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_health_request_enqueues_request_log(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Request middleware should enqueue one structured request log."""
 
     _patch_lifespan_dependencies(monkeypatch)

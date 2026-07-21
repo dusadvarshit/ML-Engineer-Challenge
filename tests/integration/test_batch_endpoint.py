@@ -119,7 +119,9 @@ def test_batch_endpoint_rejects_unimplemented_classification_task(
     )
 
     assert response.status_code == 501
-    assert response.json() == {"detail": "Batch classification is not supported yet."}
+    assert response.json() == {
+        "detail": "Batch classification is not supported yet."
+    }
 
 
 def test_batch_endpoint_rejects_batches_over_route_limit(
@@ -131,8 +133,13 @@ def test_batch_endpoint_rejects_batches_over_route_limit(
     response = client.post(
         "/api/v1/batch",
         data={"task": "detect"},
-        files=[("files", sample_upload_file(f"image-{index}.png")) for index in range(6)],
+        files=[
+            ("files", sample_upload_file(f"image-{index}.png"))
+            for index in range(6)
+        ],
     )
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Batch requests support up to 5 images."}
+    assert response.json() == {
+        "detail": "Batch requests support up to 5 images."
+    }

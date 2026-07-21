@@ -93,7 +93,9 @@ async def _enforce_rate_limit(client: AuthenticatedClient) -> None:
         return
 
     current_minute = int(time() // 60)
-    client_digest = hashlib.sha256(client.client_id.encode("utf-8")).hexdigest()
+    client_digest = hashlib.sha256(
+        client.client_id.encode("utf-8")
+    ).hexdigest()
     key = f"ratelimit:api:{client_digest}:{current_minute}"
     increment = getattr(redis_client, "incr", None)
     expire = getattr(redis_client, "expire", None)

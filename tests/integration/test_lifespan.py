@@ -26,8 +26,12 @@ def test_app_startup_succeeds_when_dependencies_are_mocked(
     async def fake_shutdown() -> None:
         calls["shutdown"] += 1
 
-    monkeypatch.setattr(main_module.redis_cache_service, "startup", fake_startup)
-    monkeypatch.setattr(main_module.redis_cache_service, "shutdown", fake_shutdown)
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "startup", fake_startup
+    )
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "shutdown", fake_shutdown
+    )
     monkeypatch.setattr(main_module.yolo_prediction_service, "load", fake_load)
 
     with TestClient(main_module.app) as client:
@@ -48,9 +52,15 @@ def test_startup_failure_from_cache_startup_bubbles_out(
     async def fake_shutdown() -> None:
         return None
 
-    monkeypatch.setattr(main_module.redis_cache_service, "startup", raise_startup_error)
-    monkeypatch.setattr(main_module.redis_cache_service, "shutdown", fake_shutdown)
-    monkeypatch.setattr(main_module.yolo_prediction_service, "load", lambda: None)
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "startup", raise_startup_error
+    )
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "shutdown", fake_shutdown
+    )
+    monkeypatch.setattr(
+        main_module.yolo_prediction_service, "load", lambda: None
+    )
 
     with pytest.raises(RuntimeError, match="redis startup failed"):
         with TestClient(main_module.app):

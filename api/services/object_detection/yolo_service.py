@@ -32,10 +32,14 @@ class YoloPredictionService:
     ) -> list[list[ObjectDetection]]:
         """Decode and run inference on multiple image payloads in one model call."""
 
-        images = [self._decode_image(image_bytes) for image_bytes in image_payloads]
+        images = [
+            self._decode_image(image_bytes) for image_bytes in image_payloads
+        ]
         return self.predict_batch(images)
 
-    def predict_batch(self, images: list[PILImage]) -> list[list[ObjectDetection]]:
+    def predict_batch(
+        self, images: list[PILImage]
+    ) -> list[list[ObjectDetection]]:
         """Run inference on multiple decoded images in a single YOLO call."""
 
         if not images:
@@ -96,7 +100,9 @@ class YoloPredictionService:
         """Resolve the first available PyTorch checkpoint in the model directory."""
 
         model_dir = settings.YOLO_MODEL_DIR
-        candidates = sorted(model_dir.glob("*.pt")) + sorted(model_dir.glob("*.pth"))
+        candidates = sorted(model_dir.glob("*.pt")) + sorted(
+            model_dir.glob("*.pth")
+        )
         if not candidates:
             raise FileNotFoundError(
                 f"No PyTorch YOLO checkpoint found in {model_dir}. "
@@ -122,7 +128,9 @@ class YoloPredictionService:
             return []
 
         xyxy = boxes.xyxy.cpu().tolist()
-        confidences = boxes.conf.cpu().tolist() if boxes.conf is not None else []
+        confidences = (
+            boxes.conf.cpu().tolist() if boxes.conf is not None else []
+        )
         class_ids = boxes.cls.cpu().tolist() if boxes.cls is not None else []
 
         detections: list[ObjectDetection] = []
@@ -133,8 +141,14 @@ class YoloPredictionService:
                     y1=float(coords[1]),
                     x2=float(coords[2]),
                     y2=float(coords[3]),
-                    confidence=float(confidences[index]) if index < len(confidences) else 0.0,
-                    class_id=int(class_ids[index]) if index < len(class_ids) else -1,
+                    confidence=(
+                        float(confidences[index])
+                        if index < len(confidences)
+                        else 0.0
+                    ),
+                    class_id=(
+                        int(class_ids[index]) if index < len(class_ids) else -1
+                    ),
                 )
             )
 

@@ -35,7 +35,7 @@ def _make_png_bytes(color: tuple[int, int, int]) -> bytes:
     """Create a small valid PNG payload with a unique pixel color."""
 
     buffer = BytesIO()
-    Image.new('RGB', (2, 2), color=color).save(buffer, format='PNG')
+    Image.new("RGB", (2, 2), color=color).save(buffer, format="PNG")
     return buffer.getvalue()
 
 
@@ -48,39 +48,48 @@ def test_repeated_detect_request_reuses_cache_and_gets_faster(
     """The second identical detect request should bypass YOLO and return faster."""
 
     fake_client = FakeRedisClient()
-    monkeypatch.setattr(router_module.redis_cache_service, '_client', fake_client)
-    monkeypatch.setattr(router_module.redis_cache_service, '_is_available', True)
-    monkeypatch.setattr(router_module.yolo_prediction_service, 'get_model_version', lambda: 'test-model')
+    monkeypatch.setattr(
+        router_module.redis_cache_service, "_client", fake_client
+    )
+    monkeypatch.setattr(
+        router_module.redis_cache_service, "_is_available", True
+    )
+    monkeypatch.setattr(
+        router_module.yolo_prediction_service,
+        "get_model_version",
+        lambda: "test-model",
+    )
 
-    predict_calls = {'count': 0}
+    predict_calls = {"count": 0}
 
     def slow_predict(_: bytes) -> list[ObjectDetection]:
-        predict_calls['count'] += 1
+        predict_calls["count"] += 1
         time.sleep(0.05)
         return [sample_detection]
 
-    monkeypatch.setattr(router_module.yolo_prediction_service, 'predict', slow_predict)
+    monkeypatch.setattr(
+        router_module.yolo_prediction_service, "predict", slow_predict
+    )
 
     started_at = time.perf_counter()
     first_response = client.post(
-        '/api/v1/detect',
-        files={'file': ('image.png', sample_image_bytes, 'image/png')},
+        "/api/v1/detect",
+        files={"file": ("image.png", sample_image_bytes, "image/png")},
     )
     first_duration = time.perf_counter() - started_at
 
     started_at = time.perf_counter()
     second_response = client.post(
-        '/api/v1/detect',
-        files={'file': ('image.png', sample_image_bytes, 'image/png')},
+        "/api/v1/detect",
+        files={"file": ("image.png", sample_image_bytes, "image/png")},
     )
     second_duration = time.perf_counter() - started_at
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
     assert first_response.json() == second_response.json()
-    assert predict_calls['count'] == 1
+    assert predict_calls["count"] == 1
     assert second_duration < first_duration * 0.5
-
 
 
 def test_repeated_mixed_batch_request_reuses_cache_and_gets_faster(
@@ -109,14 +118,24 @@ def test_repeated_mixed_batch_request_reuses_cache_and_gets_faster(
     )
 
     fake_client = FakeRedisClient()
-    monkeypatch.setattr(router_module.redis_cache_service, '_client', fake_client)
-    monkeypatch.setattr(router_module.redis_cache_service, '_is_available', True)
-    monkeypatch.setattr(router_module.yolo_prediction_service, 'get_model_version', lambda: 'test-model')
+    monkeypatch.setattr(
+        router_module.redis_cache_service, "_client", fake_client
+    )
+    monkeypatch.setattr(
+        router_module.redis_cache_service, "_is_available", True
+    )
+    monkeypatch.setattr(
+        router_module.yolo_prediction_service,
+        "get_model_version",
+        lambda: "test-model",
+    )
 
-    predict_batch_calls = {'count': 0}
+    predict_batch_calls = {"count": 0}
 
-    def slow_predict_batch(payloads: list[bytes]) -> list[list[ObjectDetection]]:
-        predict_batch_calls['count'] += 1
+    def slow_predict_batch(
+        payloads: list[bytes],
+    ) -> list[list[ObjectDetection]]:
+        predict_batch_calls["count"] += 1
         time.sleep(0.05)
         results: list[list[ObjectDetection]] = []
         for payload in payloads:
@@ -125,26 +144,36 @@ def test_repeated_mixed_batch_request_reuses_cache_and_gets_faster(
             elif payload == image_b:
                 results.append([detection_b])
             else:
-                raise AssertionError('Unexpected payload received by batch predictor.')
+                raise AssertionError(
+                    "Unexpected payload received by batch predictor."
+                )
         return results
 
-    monkeypatch.setattr(router_module.yolo_prediction_service, 'predict_batch_from_bytes', slow_predict_batch)
+    monkeypatch.setattr(
+        router_module.yolo_prediction_service,
+        "predict_batch_from_bytes",
+        slow_predict_batch,
+    )
 
     files = [
-        ('files', ('first.png', image_a, 'image/png')),
-        ('files', ('second.png', image_b, 'image/png')),
+        ("files", ("first.png", image_a, "image/png")),
+        ("files", ("second.png", image_b, "image/png")),
     ]
 
     started_at = time.perf_counter()
-    first_response = client.post('/api/v1/batch', data={'task': 'detect'}, files=files)
+    first_response = client.post(
+        "/api/v1/batch", data={"task": "detect"}, files=files
+    )
     first_duration = time.perf_counter() - started_at
 
     started_at = time.perf_counter()
-    second_response = client.post('/api/v1/batch', data={'task': 'detect'}, files=files)
+    second_response = client.post(
+        "/api/v1/batch", data={"task": "detect"}, files=files
+    )
     second_duration = time.perf_counter() - started_at
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
     assert first_response.json() == second_response.json()
-    assert predict_batch_calls['count'] == 1
+    assert predict_batch_calls["count"] == 1
     assert second_duration < first_duration * 0.5

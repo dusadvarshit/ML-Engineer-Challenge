@@ -6,12 +6,25 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, select
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+    select,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.config import settings
 from api.database import Base, session_scope
-from api.models.object_detection import BatchJobStatus, InferenceTask, ObjectDetectionModel
+from api.models.object_detection import (
+    BatchJobStatus,
+    InferenceTask,
+    ObjectDetectionModel,
+)
 
 
 class BatchJob(Base):
@@ -19,24 +32,44 @@ class BatchJob(Base):
 
     __tablename__ = "batch_jobs"
     __table_args__ = (
-        UniqueConstraint("client_id", "idempotency_key", name="uq_batch_jobs_client_idempotency"),
+        UniqueConstraint(
+            "client_id",
+            "idempotency_key",
+            name="uq_batch_jobs_client_idempotency",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    client_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     task: Mapped[str] = mapped_column(String(32), nullable=False)
     model: Mapped[str] = mapped_column(String(64), nullable=False)
-    model_version: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    model_version: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     items: Mapped[list["BatchJobItemRecord"]] = relationship(
-        back_populates="job", cascade="all, delete-orphan", order_by="BatchJobItemRecord.position"
+        back_populates="job",
+        cascade="all, delete-orphan",
+        order_by="BatchJobItemRecord.position",
     )
 
 
@@ -45,15 +78,23 @@ class BatchJobItemRecord(Base):
 
     __tablename__ = "batch_job_items"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
     job_id: Mapped[str] = mapped_column(
-        ForeignKey("batch_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("batch_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     filename: Mapped[str] = mapped_column(String(512), nullable=False)
-    content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content_type: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    detections: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    detections: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON, nullable=True
+    )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     job: Mapped[BatchJob] = relationship(back_populates="items")
 
@@ -89,7 +130,8 @@ def create_batch_job(
             status=BatchJobStatus.QUEUED.value,
             attempts=0,
             created_at=now,
-            expires_at=now + timedelta(seconds=settings.BATCH_RESULT_TTL_SECONDS),
+            expires_at=now
+            + timedelta(seconds=settings.BATCH_RESULT_TTL_SECONDS),
         )
         for position, item in enumerate(item_metadata):
             job.items.append(BatchJobItemRecord(position=position, **item))
@@ -103,11 +145,16 @@ def get_batch_job(*, job_id: str, client_id: str) -> BatchJob | None:
 
     with session_scope() as session:
         job = session.scalar(
-            select(BatchJob).where(BatchJob.id == job_id, BatchJob.client_id == client_id)
+            select(BatchJob).where(
+                BatchJob.id == job_id, BatchJob.client_id == client_id
+            )
         )
         if job is None:
             return None
-        if job.status in {BatchJobStatus.SUCCEEDED.value, BatchJobStatus.FAILED.value} and job.expires_at <= datetime.now(timezone.utc):
+        if job.status in {
+            BatchJobStatus.SUCCEEDED.value,
+            BatchJobStatus.FAILED.value,
+        } and job.expires_at <= datetime.now(timezone.utc):
             job.status = BatchJobStatus.EXPIRED.value
         _load_items(session, job)
         return job
@@ -118,7 +165,10 @@ def mark_batch_job_running(job_id: str) -> BatchJob | None:
 
     with session_scope() as session:
         job = session.get(BatchJob, job_id)
-        if job is None or job.status in {BatchJobStatus.SUCCEEDED.value, BatchJobStatus.EXPIRED.value}:
+        if job is None or job.status in {
+            BatchJobStatus.SUCCEEDED.value,
+            BatchJobStatus.EXPIRED.value,
+        }:
             return None
         job.status = BatchJobStatus.RUNNING.value
         job.attempts += 1
@@ -127,7 +177,9 @@ def mark_batch_job_running(job_id: str) -> BatchJob | None:
         return job
 
 
-def complete_batch_job(*, job_id: str, model_version: str, items: list[dict[str, Any]]) -> None:
+def complete_batch_job(
+    *, job_id: str, model_version: str, items: list[dict[str, Any]]
+) -> None:
     """Persist each result/failure and mark the completed batch successful."""
 
     with session_scope() as session:
@@ -137,7 +189,11 @@ def complete_batch_job(*, job_id: str, model_version: str, items: list[dict[str,
         job.status = BatchJobStatus.SUCCEEDED.value
         job.model_version = model_version
         job.completed_at = datetime.now(timezone.utc)
-        for record, item in zip(sorted(job.items, key=lambda value: value.position), items, strict=True):
+        for record, item in zip(
+            sorted(job.items, key=lambda value: value.position),
+            items,
+            strict=True,
+        ):
             record.detections = item.get("detections")
             record.error = item.get("error")
 

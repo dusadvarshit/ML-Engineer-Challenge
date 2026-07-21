@@ -26,11 +26,15 @@ def app(monkeypatch: pytest.MonkeyPatch):
     async def fake_cache_shutdown() -> None:
         return None
 
-    monkeypatch.setattr(main_module.redis_cache_service, "startup", fake_cache_startup)
+    monkeypatch.setattr(
+        main_module.redis_cache_service, "startup", fake_cache_startup
+    )
     monkeypatch.setattr(
         main_module.redis_cache_service, "shutdown", fake_cache_shutdown
     )
-    monkeypatch.setattr(main_module.yolo_prediction_service, "load", lambda: None)
+    monkeypatch.setattr(
+        main_module.yolo_prediction_service, "load", lambda: None
+    )
     monkeypatch.setattr(
         main_module.settings,
         "API_KEYS",
@@ -44,7 +48,9 @@ def client(app) -> Iterator[TestClient]:
     """Return a TestClient for the FastAPI app."""
 
     with TestClient(app) as test_client:
-        test_client.headers[main_module.settings.API_KEY_HEADER_NAME] = "test-api-key"
+        test_client.headers[main_module.settings.API_KEY_HEADER_NAME] = (
+            "test-api-key"
+        )
         yield test_client
 
 

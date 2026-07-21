@@ -81,19 +81,25 @@ class FakeModel:
         self.eval_called = True
 
 
-def test_predict_returns_first_batch_result(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_predict_returns_first_batch_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Single-image predictions should unwrap the first batch response."""
 
     service = DetrPredictionService()
     expected = [[{"mock": "detection"}], []]
-    monkeypatch.setattr(service, "predict_batch_from_bytes", lambda _: expected)
+    monkeypatch.setattr(
+        service, "predict_batch_from_bytes", lambda _: expected
+    )
 
     result = service.predict(b"image-bytes")
 
     assert result == expected[0]
 
 
-def test_predict_batch_from_bytes_decodes_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_predict_batch_from_bytes_decodes_all_images(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Raw image payloads should be decoded before batch inference."""
 
     service = DetrPredictionService()
@@ -102,9 +108,13 @@ def test_predict_batch_from_bytes_decodes_all_images(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         service,
         "_decode_image",
-        lambda image_bytes: decoded_images[0] if image_bytes == b"one" else decoded_images[1],
+        lambda image_bytes: (
+            decoded_images[0] if image_bytes == b"one" else decoded_images[1]
+        ),
     )
-    monkeypatch.setattr(service, "predict_batch", lambda images: [list(images)])
+    monkeypatch.setattr(
+        service, "predict_batch", lambda images: [list(images)]
+    )
 
     result = service.predict_batch_from_bytes([b"one", b"two"])
 
@@ -130,7 +140,9 @@ def test_decode_image_returns_rgb_image(sample_image_bytes: bytes) -> None:
     assert image.size == (1, 1)
 
 
-def test_resolve_model_path_requires_expected_artifacts(tmp_path: Path) -> None:
+def test_resolve_model_path_requires_expected_artifacts(
+    tmp_path: Path,
+) -> None:
     """The service should resolve the DETR directory only when required files exist."""
 
     service = DetrPredictionService()
@@ -138,7 +150,9 @@ def test_resolve_model_path_requires_expected_artifacts(tmp_path: Path) -> None:
     (tmp_path / "model.safetensors").write_bytes(b"weights")
     (tmp_path / "preprocessor_config.json").write_text("{}")
 
-    from api.services.object_detection import detr_service as detr_service_module
+    from api.services.object_detection import (
+        detr_service as detr_service_module,
+    )
 
     original_dir = detr_service_module.settings.DETR_MODEL_DIR
     detr_service_module.settings.DETR_MODEL_DIR = tmp_path
@@ -150,23 +164,31 @@ def test_resolve_model_path_requires_expected_artifacts(tmp_path: Path) -> None:
     assert resolved == tmp_path
 
 
-def test_resolve_model_path_raises_when_artifacts_are_missing(tmp_path: Path) -> None:
+def test_resolve_model_path_raises_when_artifacts_are_missing(
+    tmp_path: Path,
+) -> None:
     """The service should raise a clear error when DETR files are incomplete."""
 
     service = DetrPredictionService()
 
-    from api.services.object_detection import detr_service as detr_service_module
+    from api.services.object_detection import (
+        detr_service as detr_service_module,
+    )
 
     original_dir = detr_service_module.settings.DETR_MODEL_DIR
     detr_service_module.settings.DETR_MODEL_DIR = tmp_path
     try:
-        with pytest.raises(FileNotFoundError, match="Missing DETR model artifacts"):
+        with pytest.raises(
+            FileNotFoundError, match="Missing DETR model artifacts"
+        ):
             service._resolve_model_path()
     finally:
         detr_service_module.settings.DETR_MODEL_DIR = original_dir
 
 
-def test_predict_batch_normalizes_model_results(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_predict_batch_normalizes_model_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Batch inference should normalize DETR outputs into API schema objects."""
 
     service = DetrPredictionService()
@@ -182,7 +204,9 @@ def test_predict_batch_normalizes_model_results(monkeypatch: pytest.MonkeyPatch)
     )
     fake_model = FakeModel()
 
-    monkeypatch.setattr(service, "_load_model", lambda: (fake_model, fake_processor))
+    monkeypatch.setattr(
+        service, "_load_model", lambda: (fake_model, fake_processor)
+    )
     monkeypatch.setattr(service, "_load_torch", lambda: fake_torch)
 
     predictions = service.predict_batch([SimpleNamespace(height=10, width=20)])
@@ -200,7 +224,9 @@ def test_predict_batch_normalizes_model_results(monkeypatch: pytest.MonkeyPatch)
     assert fake_processor.post_process_calls[0][1] == 0.5
 
 
-def test_load_warms_up_loaded_artifacts(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_warms_up_loaded_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Service load should trigger both model loading and warmup."""
 
     service = DetrPredictionService()
@@ -208,7 +234,9 @@ def test_load_warms_up_loaded_artifacts(monkeypatch: pytest.MonkeyPatch) -> None
     fake_processor = FakeProcessor()
     warmup_calls = []
 
-    monkeypatch.setattr(service, "_load_model", lambda: (fake_model, fake_processor))
+    monkeypatch.setattr(
+        service, "_load_model", lambda: (fake_model, fake_processor)
+    )
     monkeypatch.setattr(
         service,
         "_warm_up",
@@ -220,23 +248,35 @@ def test_load_warms_up_loaded_artifacts(monkeypatch: pytest.MonkeyPatch) -> None
     assert warmup_calls == [(fake_model, fake_processor)]
 
 
-def test_get_model_version_uses_cached_model_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_model_version_uses_cached_model_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Model version should not hit the filesystem again once the path is cached."""
 
     service = DetrPredictionService()
-    service._model_path = Path("models/artifacts/object_detection/detr_resnet50/v1.0.0/pytorch")
+    service._model_path = Path(
+        "models/artifacts/object_detection/detr_resnet50/v1.0.0/pytorch"
+    )
 
-    monkeypatch.setattr(service, "_resolve_model_path", lambda: (_ for _ in ()).throw(AssertionError))
+    monkeypatch.setattr(
+        service,
+        "_resolve_model_path",
+        lambda: (_ for _ in ()).throw(AssertionError),
+    )
 
     assert service.get_model_version() == "detr_resnet50-v1.0.0-pytorch"
 
 
-def test_normalize_result_uses_defaults_when_scores_or_labels_missing() -> None:
+def test_normalize_result_uses_defaults_when_scores_or_labels_missing() -> (
+    None
+):
     """Missing optional result data should fall back to API-safe defaults."""
 
     service = DetrPredictionService()
 
-    detections = service._normalize_result({"boxes": FakeTensor([[1, 2, 3, 4]])})
+    detections = service._normalize_result(
+        {"boxes": FakeTensor([[1, 2, 3, 4]])}
+    )
 
     assert detections[0].confidence == 0.0
     assert detections[0].class_id == -1
@@ -258,13 +298,17 @@ def test_load_model_raises_runtime_error_when_transformers_are_missing(
     def raise_missing_dependency():
         raise ModuleNotFoundError("No module named transformers")
 
-    monkeypatch.setattr(service, "_load_runtime_dependencies", raise_missing_dependency)
+    monkeypatch.setattr(
+        service, "_load_runtime_dependencies", raise_missing_dependency
+    )
 
     with pytest.raises(RuntimeError, match="Transformers is required"):
         service._load_model()
 
 
-def test_load_model_caches_loaded_artifacts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_model_caches_loaded_artifacts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """The service should instantiate the DETR artifacts once and reuse them."""
 
     service = DetrPredictionService()

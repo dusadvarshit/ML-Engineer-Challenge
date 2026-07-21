@@ -31,10 +31,14 @@ class RetinaNetPredictionService:
         self,
         image_payloads: list[bytes],
     ) -> list[list[ObjectDetection]]:
-        images = [self._decode_image(image_bytes) for image_bytes in image_payloads]
+        images = [
+            self._decode_image(image_bytes) for image_bytes in image_payloads
+        ]
         return self.predict_batch(images)
 
-    def predict_batch(self, images: list[PILImage]) -> list[list[ObjectDetection]]:
+    def predict_batch(
+        self, images: list[PILImage]
+    ) -> list[list[ObjectDetection]]:
         if not images:
             return []
 
@@ -57,10 +61,10 @@ class RetinaNetPredictionService:
 
     def _load_runtime_dependencies(self) -> tuple[Any, Any, Any]:
         import torch
-        from torchvision.models.detection import retinanet_resnet50_fpn
-        from torchvision.transforms.functional import to_tensor
+        import torchvision.models.detection as torchvision_detection  # type: ignore[import-untyped]
+        from torchvision.transforms.functional import to_tensor  # type: ignore[import-untyped]
 
-        return torch, retinanet_resnet50_fpn, to_tensor
+        return torch, torchvision_detection.retinanet_resnet50_fpn, to_tensor
 
     def _load_model(self) -> tuple[Any, Any, Any]:
         if self._model is not None and self._to_tensor is not None:
@@ -113,7 +117,9 @@ class RetinaNetPredictionService:
 
         return model_path.name
 
-    def _normalize_result(self, result: dict[str, Any]) -> list[ObjectDetection]:
+    def _normalize_result(
+        self, result: dict[str, Any]
+    ) -> list[ObjectDetection]:
         boxes = result.get("boxes")
         if boxes is None:
             return []
@@ -132,8 +138,14 @@ class RetinaNetPredictionService:
                     y1=float(coords[1]),
                     x2=float(coords[2]),
                     y2=float(coords[3]),
-                    confidence=float(confidences[index]) if index < len(confidences) else 0.0,
-                    class_id=int(class_ids[index]) if index < len(class_ids) else -1,
+                    confidence=(
+                        float(confidences[index])
+                        if index < len(confidences)
+                        else 0.0
+                    ),
+                    class_id=(
+                        int(class_ids[index]) if index < len(class_ids) else -1
+                    ),
                 )
             )
 

@@ -9,27 +9,25 @@ from api.models.object_detection import ObjectDetection, ObjectDetectionModel
 from api.models.model_metadata import ModelMetadata
 from api.services.classification import classification_prediction_service
 from api.services.object_detection.detr_service import detr_prediction_service
-from api.services.object_detection.retinanet_service import retinanet_prediction_service
+from api.services.object_detection.retinanet_service import (
+    retinanet_prediction_service,
+)
 from api.services.object_detection.yolo_service import yolo_prediction_service
 
 
 class ObjectDetectionPredictionService(Protocol):
     """Minimal contract required by the object detection router."""
 
-    def predict(self, image_bytes: bytes) -> list[ObjectDetection]:
-        ...
+    def predict(self, image_bytes: bytes) -> list[ObjectDetection]: ...
 
     def predict_batch_from_bytes(
         self,
         image_payloads: list[bytes],
-    ) -> list[list[ObjectDetection]]:
-        ...
+    ) -> list[list[ObjectDetection]]: ...
 
-    def load(self) -> None:
-        ...
+    def load(self) -> None: ...
 
-    def get_model_version(self) -> str:
-        ...
+    def get_model_version(self) -> str: ...
 
 
 _OBJECT_DETECTION_SERVICES: dict[

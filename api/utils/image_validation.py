@@ -27,7 +27,10 @@ async def read_validated_image(file: UploadFile) -> bytes:
     if not payload:
         raise HTTPException(
             status_code=400,
-            detail={"code": "empty_image", "message": "Uploaded image is empty."},
+            detail={
+                "code": "empty_image",
+                "message": "Uploaded image is empty.",
+            },
         )
     if len(payload) > settings.MAX_FILE_SIZE:
         raise HTTPException(
@@ -66,7 +69,11 @@ async def read_validated_image(file: UploadFile) -> bytes:
     finally:
         Image.MAX_IMAGE_PIXELS = previous_limit
 
-    if not width or not height or max(width, height) > settings.MAX_IMAGE_DIMENSION:
+    if (
+        not width
+        or not height
+        or max(width, height) > settings.MAX_IMAGE_DIMENSION
+    ):
         raise HTTPException(
             status_code=400,
             detail={

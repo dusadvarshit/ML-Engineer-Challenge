@@ -8,14 +8,19 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from api.config import settings
 from api.middleware.auth import require_api_key
 from api.metrics import observe_inference
-from api.models.classification import ClassificationModel, ClassificationResponse
+from api.models.classification import (
+    ClassificationModel,
+    ClassificationResponse,
+)
 from api.services.classification import (
     ClassificationUnavailableError,
     classification_prediction_service,
 )
 from api.utils.image_validation import read_validated_image
 
-router = APIRouter(tags=["classification"], dependencies=[Depends(require_api_key)])
+router = APIRouter(
+    tags=["classification"], dependencies=[Depends(require_api_key)]
+)
 
 
 @router.post(
@@ -33,7 +38,9 @@ async def classify_image(
 ) -> ClassificationResponse:
     """Classify a validated image with the configured serving model."""
 
-    selected_model = model or ClassificationModel(settings.CLASSIFICATION_MODEL_NAME)
+    selected_model = model or ClassificationModel(
+        settings.CLASSIFICATION_MODEL_NAME
+    )
     configured_model = ClassificationModel(settings.CLASSIFICATION_MODEL_NAME)
     if selected_model != configured_model:
         raise HTTPException(
@@ -47,7 +54,9 @@ async def classify_image(
     image_bytes = await read_validated_image(file)
     started_at = perf_counter()
     try:
-        predictions = classification_prediction_service.predict(image_bytes, top_k)
+        predictions = classification_prediction_service.predict(
+            image_bytes, top_k
+        )
     except ClassificationUnavailableError as exc:
         observe_inference(
             task="classify",
